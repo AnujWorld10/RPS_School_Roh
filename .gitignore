@@ -1,0 +1,71 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv/
+venv/
+ENV/
+env/
+__pypackages__/
+
+# Packaging
+dist/
+build/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.egg
+*.whl
+.installed.cfg
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# Type checkers / static analysis
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.code-workspace
+
+# Logs
+*.log
+logs/
+!logs/.gitkeep
+
+# Local uploads / user files
+uploads/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PyInstaller
+*.manifest
+*.spec
+
+# C extensions
+*.so
+*.dylib
+*.pyd
+
+# Misc
+coverage.xml
+nosetests.xml
+pytestdebug.log
