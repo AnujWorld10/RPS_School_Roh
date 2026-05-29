@@ -96,7 +96,9 @@ def upgrade() -> None:
         if "student_code" not in student_cols:
             op.add_column("students", sa.Column("student_code", sa.String(20), nullable=True))
             op.execute("UPDATE students SET student_code = CONCAT('STU', id) WHERE student_code IS NULL")
-            op.alter_column("students", "student_code", nullable=False)
+            # op.alter_column("students", "student_code", nullable=False)
+            op.alter_column('students', 'student_code', type_=sa.String(20), existing_type=sa.String(20), nullable=False)
+
             op.create_unique_constraint("uq_student_code", "students", ["student_code"])
         if "inquiry_id" not in student_cols:
             op.add_column("students", sa.Column("inquiry_id", sa.BigInteger(), nullable=True))

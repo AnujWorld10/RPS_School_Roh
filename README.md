@@ -64,13 +64,55 @@ DATABASE_URL=mysql+pymysql://root:mysql@localhost:3306/school_db
 JWT_SECRET_KEY=your-long-random-secret-key-here
 ```
 
-### 3. Install and migrate
+
+### 3. Install and Migrate
+
+Follow these steps to set up your local development environment and initialize the database.
+
+#### 3.1 Create and Activate Virtual Environment
 
 ```powershell
+# Create the virtual environment
 python -m venv .venv
+
+# Activate the virtual environment
 .\.venv\Scripts\Activate.ps1
+
+```
+
+> **Note:** If you encounter an error stating *"...cannot be loaded because running scripts is disabled on this system,"* run the following command to allow scripts for your current session:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+> 
+> ```
+> 
+> 
+> After running this, try activating the environment again with `.\.venv\Scripts\Activate.ps1`.
+
+#### 3.2 Install Dependencies
+
+Ensure you are in the project root directory and run:
+
+```powershell
 pip install -e ".[dev]"
+
+```
+
+#### 3.3 Configure Environment Variables
+
+Before running the application, you must create your environment configuration file:
+
+1. Navigate to the project root directory.
+2. Create a file named `.env` (you can base it on the provided `.env.example` file).
+3. Ensure your `DATABASE_URL` and `JWT_SECRET_KEY` are correctly configured for your local machine.
+
+#### 3.4 Database Migrations
+
+Once dependencies are installed and your `.env` file is configured, apply the database migrations to create the schema:
+
+```powershell
 alembic upgrade head
+
 ```
 
 ### 4. Run the application
