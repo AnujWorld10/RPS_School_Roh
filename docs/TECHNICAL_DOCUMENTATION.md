@@ -193,7 +193,7 @@ pip install -e ".[dev]"
 
 ### 3.4 Environment Variables
 
-Copy `.env.example` to `.env`:
+Copy `.env.example` to `.env` and update the settings for your machine:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -234,6 +234,92 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **Important:** Run from project root with `app.main:app`, not `main:app` from inside `app/`.
+
+### 3.7 Docker Setup
+
+This project supports both local and Docker database deployment modes.
+
+#### 3.7.1 Docker container + local MySQL
+
+Use this when your application runs in Docker but your MySQL server stays on the host machine.
+
+1. Ensure your host MySQL is running and the `school_db` database exists.
+2. Update `.env` to point to the host database from inside Docker:
+
+```env
+DATABASE_URL=mysql+pymysql://root:mysql@host.docker.internal:3306/school_db
+JWT_SECRET_KEY=your-long-random-secret-key-here
+```
+
+3. Build the Docker image:
+
+```powershell
+docker build -t school_api_image -f docker/Dockerfile .
+```
+
+4. Run the container with the `.env` file:
+
+```powershell
+docker run --rm -p 8000:8000 --env-file .env school_api_image
+```
+
+5. Open the app:
+
+```text
+http://localhost:8000/health
+```
+
+#### 3.7.2 Docker container + Docker MySQL
+
+Use this when both the API and MySQL run inside Docker.
+
+1. Start Docker Compose from the project root:
+
+```powershell
+docker compose -f docker/docker-compose.yml up -d
+```
+
+2. Confirm services:
+
+```powershell
+docker compose -f docker/docker-compose.yml ps
+```
+
+You should see:
+- `db` (MySQL)
+- `api` (FastAPI)
+
+3. Inspect logs:
+
+```powershell
+docker compose -f docker/docker-compose.yml logs -f api
+```
+
+4. Open the health endpoint:
+
+```text
+http://localhost:8000/health
+```
+
+5. Connect to Docker MySQL from Windows if needed:
+
+- Host: `127.0.0.1`
+- Port: `3307`
+- User: `root`
+- Password: `mysql`
+- Database: `school_db`
+
+6. Stop services:
+
+```powershell
+docker compose -f docker/docker-compose.yml down
+```
+
+7. Remove the MySQL volume for a fresh start:
+
+```powershell
+docker compose -f docker/docker-compose.yml down -v
+```
 
 ---
 
@@ -1088,9 +1174,34 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-- MySQL on host port `3307` (avoids conflict with local 3306)
-- API on `8000`
-- Credentials: `root` / `mysql`
+This starts two containers:
+
+- `db` → Dockerized MySQL
+- `api` → FastAPI application
+
+When using Compose:
+
+- The API connects to MySQL at `mysql+pymysql://root:mysql@db:3306/school_db`
+- The host maps MySQL container port `3306` to host port `3307`
+- The API is available on host port `8000`
+
+To watch the API logs:
+
+```powershell
+docker compose -f docker/docker-compose.yml logs -f api
+```
+
+To stop and remove the containers:
+
+```powershell
+docker compose -f docker/docker-compose.yml down
+```
+
+To reset the Docker MySQL database data:
+
+```powershell
+docker compose -f docker/docker-compose.yml down -v
+```
 
 ### 14.3 Production (Recommended)
 
