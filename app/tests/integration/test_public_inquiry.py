@@ -1,28 +1,37 @@
 """Integration tests for public student inquiry APIs."""
 
 import pytest
+from datetime import datetime
 
-INQUIRY_PAYLOAD = {
-    "first_name": "Aarav",
-    "middle_name": "Kumar",
-    "last_name": "Sharma",
-    "gender": "male",
-    "father_name": "Rohit Sharma",
-    "dob": "2018-04-10",
-    "student_mobile": "+919999999999",
-    "parent_mobile": "+911234567890",
-    "email": "parent@example.com",
-    "address": "123 School Road, City",
-    "last_school": "ABC Public School",
-    "current_class": "Grade 4",
-    "admission_for_class": "Grade 5",
-    "last_school_percentage": 85.5,
-}
+
+def get_unique_inquiry_payload(suffix=""):
+    """Generate unique inquiry payload to avoid duplicate detection across tests."""
+    if not suffix:
+        suffix = datetime.now().strftime("%s%f")[5:12]  # Unique suffix
+    return {
+        "first_name": f"Aarav{suffix}",
+        "middle_name": "Kumar",
+        "last_name": f"Sharma{suffix}",
+        "gender": "male",
+        "father_name": f"Rohit{suffix}",
+        "dob": "2018-04-10",
+        "student_mobile": f"+9199999{suffix}",
+        "parent_mobile": f"+9112345{suffix}",
+        "email": f"parent{suffix}@example.com",
+        "address": "123 School Road, City",
+        "last_school": "ABC Public School",
+        "current_class": "Grade 4",
+        "admission_for_class": "Grade 5",
+        "last_school_percentage": 85.5,
+    }
 
 
 def test_public_create_inquiry(client):
     """POST /public/student/inquiry returns inquiry_code and PENDING status."""
-    response = client.post("/api/v1/public/student/inquiry", json=INQUIRY_PAYLOAD)
+    payload = get_unique_inquiry_payload("001")
+    response = client.post("/api/v1/public/student/inquiry", json=payload)
+    if response.status_code != 201:
+        print("CREATE RESPONSE JSON:", response.json())
     assert response.status_code == 201
     body = response.json()
     assert body["success"] is True
@@ -33,7 +42,9 @@ def test_public_create_inquiry(client):
 
 def test_public_status_check(client):
     """GET status by inquiry_code returns timeline after create."""
-    create_resp = client.post("/api/v1/public/student/inquiry", json=INQUIRY_PAYLOAD)
+    payload = get_unique_inquiry_payload("002")
+    create_resp = client.post("/api/v1/public/student/inquiry", json=payload)
+    assert create_resp.status_code == 201
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
 
     status_resp = client.get(f"/api/v1/public/student/inquiry/status/{inquiry_code}")
@@ -47,7 +58,9 @@ def test_public_status_check(client):
 
 def test_public_update_requires_credentials(client):
     """PUT update fails without matching verification fields."""
-    create_resp = client.post("/api/v1/public/student/inquiry", json=INQUIRY_PAYLOAD)
+    payload = get_unique_inquiry_payload("003")
+    create_resp = client.post("/api/v1/public/student/inquiry", json=payload)
+    assert create_resp.status_code == 201
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
 
     bad_update = {
@@ -62,12 +75,14 @@ def test_public_update_requires_credentials(client):
 
 def test_public_update_success(client):
     """PUT update succeeds when inquiry_code, email, and parent_mobile match."""
-    create_resp = client.post("/api/v1/public/student/inquiry", json=INQUIRY_PAYLOAD)
+    payload = get_unique_inquiry_payload("004")
+    create_resp = client.post("/api/v1/public/student/inquiry", json=payload)
+    assert create_resp.status_code == 201
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
     update_payload = {
         "inquiry_code": inquiry_code,
-        "email": INQUIRY_PAYLOAD["email"],
-        "parent_mobile": INQUIRY_PAYLOAD["parent_mobile"],
+        "email": payload["email"],
+        "parent_mobile": payload["parent_mobile"],
         "first_name": "AaravUpdated",
     }
     response = client.put("/api/v1/public/student/inquiry/update", json=update_payload)
