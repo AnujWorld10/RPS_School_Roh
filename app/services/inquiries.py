@@ -41,7 +41,9 @@ class InquiryService:
 
     def __init__(self, session: Session) -> None:
         self.session = session
+        # Repository aliases: some methods use `repo`, others expect `inquiries`
         self.repo = StudentInquiryRepository(session)
+        self.inquiries = self.repo
         self.history = InquiryStatusHistoryRepository(session)
         self.classes = ClassRepository(session)
         self.audit = AuditService(session)

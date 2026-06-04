@@ -3,13 +3,13 @@ from datetime import datetime
 from sqlalchemy import BigInteger, DateTime, ForeignKey, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.db.base import Base, BigInt
 
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInt, primary_key=True, autoincrement=True)
     actor_user_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("users.id"),

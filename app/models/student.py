@@ -7,7 +7,7 @@ from datetime import date
 from sqlalchemy import BigInteger, Date, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, SoftDeleteMixin, TimestampMixin
+from app.db.base import Base, BigInt, SoftDeleteMixin, TimestampMixin
 from app.models.enums import StudentStatus
 
 
@@ -31,7 +31,7 @@ class Student(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         primary_key=True,
         autoincrement=True,
         comment="Internal surrogate primary key",

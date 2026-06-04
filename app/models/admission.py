@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, BigInt, TimestampMixin
 from app.models.enums import AdmissionStatus, DocumentVerificationStatus
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class InquiryAdmission(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         primary_key=True,
         autoincrement=True,
         comment="Internal surrogate primary key",
@@ -120,7 +120,7 @@ class AdmissionDocument(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         primary_key=True,
         autoincrement=True,
         comment="Surrogate primary key",
@@ -178,7 +178,7 @@ class StudentAdmission(Base, TimestampMixin):
         UniqueConstraint("student_id", "academic_year", name="uq_student_admission_year"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInt, primary_key=True, autoincrement=True)
     student_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("students.id"),

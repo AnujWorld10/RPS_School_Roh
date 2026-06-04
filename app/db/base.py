@@ -1,7 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# SQLite treats only INTEGER PRIMARY KEY as auto-incrementing primary key.
+# Use Integer for SQLite while preserving BigInteger for other dialects.
+BigInt = BigInteger().with_variant(Integer, "sqlite")
 
 
 class Base(DeclarativeBase):

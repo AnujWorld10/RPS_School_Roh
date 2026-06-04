@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import BigInteger, Date, ForeignKey, String, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, BigInt, TimestampMixin
 from app.models.enums import InterviewMode, InterviewResult
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ class InterviewSchedule(Base, TimestampMixin):
     __table_args__ = {"comment": "Interview and test appointments for student inquiries"}
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         primary_key=True,
         autoincrement=True,
         comment="Surrogate primary key",

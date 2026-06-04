@@ -1,7 +1,7 @@
 from sqlalchemy import BigInteger, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, SoftDeleteMixin, TimestampMixin
+from app.db.base import Base, BigInt, SoftDeleteMixin, TimestampMixin
 from app.models.enums import ClassStatus
 
 
@@ -11,7 +11,7 @@ class Class(Base, TimestampMixin, SoftDeleteMixin):
         UniqueConstraint("name", "section", "academic_year", name="uq_class_name_section_year"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInt, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     section: Mapped[str | None] = mapped_column(String(20), nullable=True)
     academic_year: Mapped[str] = mapped_column(String(20), nullable=False, index=True)

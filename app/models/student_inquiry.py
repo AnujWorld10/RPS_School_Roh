@@ -25,7 +25,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, BigInt, TimestampMixin
 from app.models.enums import Gender, InquiryStatus
 
 if TYPE_CHECKING:
@@ -53,7 +53,7 @@ class StudentInquiry(Base, TimestampMixin):
 
     # --- Primary key ---
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         primary_key=True,
         autoincrement=True,
         comment="Internal surrogate primary key",
@@ -213,7 +213,7 @@ class InquiryStatusHistory(Base):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         primary_key=True,
         autoincrement=True,
         comment="Surrogate primary key for this history row",

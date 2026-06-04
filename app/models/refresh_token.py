@@ -3,13 +3,13 @@ from datetime import datetime
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, BigInt, TimestampMixin
 
 
 class RefreshToken(Base, TimestampMixin):
     __tablename__ = "refresh_tokens"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInt, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("users.id", ondelete="CASCADE"),

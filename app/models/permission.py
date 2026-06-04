@@ -1,13 +1,13 @@
 from sqlalchemy import BigInteger, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base
+from app.db.base import Base, BigInt
 
 
 class Permission(Base):
     __tablename__ = "permissions"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInt, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     module: Mapped[str] = mapped_column(String(100), nullable=False)
     action: Mapped[str] = mapped_column(String(50), nullable=False)
