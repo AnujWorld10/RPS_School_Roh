@@ -111,8 +111,15 @@ Once dependencies are installed and your `.env` file is configured, apply the da
 
 ```powershell
 alembic upgrade head
-
 ```
+
+Seed the default roles, permissions, and admin data manually:
+
+```powershell
+python scripts/seed_db.py
+```
+
+If you want the app to seed on startup in development only, set `SEED_ON_STARTUP=true` in `.env`. For production, leave it `false` and run seeding manually when needed.
 
 ### 4. Run the application
 
@@ -238,6 +245,13 @@ On first startup, a super admin user is seeded automatically:
 |-------|-------|
 | Email | `superadmin@school.com` |
 | Password | `SuperAdmin@123` |
+
+<!-- Example: Request Body
+{
+  "email": "superadmin@school.com",
+  "password": "SuperAdmin@123"
+} 
+-->
 
 If you seeded earlier with `superadmin@school.local`, that address still works for login, or update the row in MySQL:
 

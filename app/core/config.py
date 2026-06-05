@@ -59,6 +59,11 @@ class Settings(BaseSettings):
         description="Emit logs to daily files under log_dir",
     )
 
+    seed_on_startup: bool = Field(
+        default=False,
+        description="Run default seed only when explicitly enabled",
+    )
+
     cors_origins: str = "http://localhost:3000"
 
     upload_dir: str = Field(

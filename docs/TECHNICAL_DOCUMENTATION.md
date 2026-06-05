@@ -217,9 +217,12 @@ Copy `.env.example` to `.env` and update the settings for your machine:
 
 ```powershell
 alembic upgrade head
+python scripts/seed_db.py
 ```
 
-On startup, the application runs `seed_database()` which creates:
+Seeding is now manual by default. The `SEED_ON_STARTUP` environment variable controls whether the application seeds at startup, and it defaults to `false`.
+
+The manual seed creates:
 
 - Default roles and permissions
 - **Super admin user** (if not exists):
