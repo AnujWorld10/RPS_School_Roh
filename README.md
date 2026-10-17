@@ -54,7 +54,7 @@ CREATE DATABASE IF NOT EXISTS school_db
 
 ```powershell
 "Navigate to the project root directory (where pyproject.toml is located)"
-cd D:\SCHOOL_MANAGEMENT 
+cd D:\SCHOOL_MANAGEMENT
 copy .env.example .env "It will Create a local environment file from the sample configuration"
 ```
 Edit `.env` — default local connection:
@@ -91,10 +91,7 @@ python -m venv .venv
 > **Note:** If you encounter an error stating *"...cannot be loaded because running scripts is disabled on this system,"* run the following command to allow scripts for your current session:
 > ```powershell
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-> 
 > ```
-> 
-> 
 > After running this, try activating the environment again with `.\.venv\Scripts\Activate.ps1`.
 
 #### 3.2 Install Dependencies
