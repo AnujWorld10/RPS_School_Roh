@@ -19,10 +19,13 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 
+RUN mkdir -p /app/logs /app/uploads \
+    && chown -R appuser:appuser /app/logs /app/uploads
+
 RUN pip install --upgrade pip && pip install -e .
 
 USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"

@@ -53,10 +53,10 @@ CREATE DATABASE IF NOT EXISTS school_db
 ### 2. Configure environment
 
 ```powershell
-cd D:\SCHOOL_MANAGEMENT
-copy .env.example .env
+"Navigate to the project root directory (where pyproject.toml is located)"
+cd D:\SCHOOL_MANAGEMENT 
+copy .env.example .env "It will Create a local environment file from the sample configuration"
 ```
-
 Edit `.env` — default local connection:
 
 ```env
@@ -73,14 +73,62 @@ For upgrades from versions that created `superadmin@school.com` with a built-in
 password, set `INITIAL_ADMIN_EMAIL` to that address and provide a new strong
 password for one startup; remove both settings afterward.
 
-### 3. Install and migrate
+### 3. Install and Migrate
+
+Follow these steps to set up your local development environment and initialize the database.
+
+#### 3.1 Create and Activate Virtual Environment
 
 ```powershell
+# Create the virtual environment
 python -m venv .venv
+
+# Activate the virtual environment
 .\.venv\Scripts\Activate.ps1
+
+```
+
+> **Note:** If you encounter an error stating *"...cannot be loaded because running scripts is disabled on this system,"* run the following command to allow scripts for your current session:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+> 
+> ```
+> 
+> 
+> After running this, try activating the environment again with `.\.venv\Scripts\Activate.ps1`.
+
+#### 3.2 Install Dependencies
+
+Ensure you are in the project root directory and run:
+
+```powershell
 pip install -e ".[dev]"
+
+```
+
+#### 3.3 Configure Environment Variables
+
+Before running the application, you must create your environment configuration file:
+
+1. Navigate to the project root directory.
+2. Create a file named `.env` (you can base it on the provided `.env.example` file).
+3. Ensure your `DATABASE_URL` and `JWT_SECRET_KEY` are correctly configured for your local machine.
+
+#### 3.4 Database Migrations
+
+Once dependencies are installed and your `.env` file is configured, apply the database migrations to create the schema:
+
+```powershell
 alembic upgrade head
 ```
+
+Seed the default roles, permissions, and admin data manually:
+
+```powershell
+python scripts/seed_db.py
+```
+
+If you want the app to seed on startup in development only, set `SEED_ON_STARTUP=true` in `.env`. For production, leave it `false` and run seeding manually when needed.
 
 ### 4. Run the application
 
@@ -95,7 +143,106 @@ uvicorn app.main:app --reload
 | ReDoc | http://127.0.0.1:8000/redoc |
 | Health check | http://127.0.0.1:8000/health |
 
-**Important:** Run from the **project root** using `app.main:app`, not `uvicorn main:app` from inside the `app/` folder.
+**Important:** Run from the **project root** using `uvicorn app.main:app`.
+
+---
+
+## Run with Docker
+
+This project supports two Docker-based scenarios:
+
+1. Docker image/container with a local MySQL database.
+2. Docker image/container with Docker-managed MySQL.
+
+### Scenario 2: Docker container + local MySQL
+
+Use this when you want the app to run inside Docker, but your MySQL server remains on your host machine.
+
+1. Ensure your host MySQL is running and the `school_db` database exists.
+2. Update `.env` to point the container to your host database:
+
+```env
+DATABASE_URL=mysql+pymysql://root:mysql@host.docker.internal:3306/school_db
+JWT_SECRET_KEY=your-long-random-secret-key-here
+```
+
+3. Build the Docker image from the project root:
+
+```powershell
+docker build -t school_api_image -f docker/Dockerfile .
+```
+
+4. Run the container using your `.env` file:
+
+```powershell
+docker run --rm -p 8000:8000 --env-file .env school_api_image
+```
+
+5. Open the app:
+
+```text
+http://localhost:8000/health
+```
+
+Notes:
+- `host.docker.internal` allows the container to access MySQL on the Windows host.
+- The Docker image entrypoint runs migrations before starting the app.
+
+### Scenario 3: Docker container + Docker MySQL
+
+Use this when you want both the API and database to run entirely in Docker.
+
+1. From the project root, start Docker Compose:
+
+```powershell
+docker compose -f docker/docker-compose.yml up -d
+```
+
+2. Check the two services:
+
+```powershell
+docker compose -f docker/docker-compose.yml ps
+```
+
+You should see:
+- `db` (MySQL)
+- `api` (FastAPI)
+
+3. Watch the API startup logs:
+
+```powershell
+docker compose -f docker/docker-compose.yml logs -f api
+```
+
+4. Open the app:
+
+```text
+http://localhost:8000/health
+```
+
+5. If you need to connect to the Docker MySQL server from Windows, use:
+
+- Host: `127.0.0.1`
+- Port: `3307`
+- User: `root`
+- Password: `mysql`
+- Database: `school_db`
+
+6. To stop the Docker environment:
+
+```powershell
+docker compose -f docker/docker-compose.yml down
+```
+
+7. To remove the MySQL data volume and reset the database:
+
+```powershell
+docker compose -f docker/docker-compose.yml down -v
+```
+
+Important:
+- Docker Compose already sets the API service `DATABASE_URL` to use the internal MySQL service host `db`.
+- Do not use `localhost` inside the API container for the database when using Docker Compose.
 
 ---
 

@@ -18,7 +18,7 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     setup_logging()
-    if settings.app_env != "test":
+    if settings.app_env != "test" and settings.seed_on_startup:
         seed_database()
     yield
 
