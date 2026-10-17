@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import EmailStr, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Project root (parent of ``app/``)
@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
+    initial_admin_email: EmailStr | None = None
+    initial_admin_password: SecretStr | None = None
 
     password_hash_scheme: str = "argon2"
     log_level: str = "INFO"
@@ -78,6 +80,14 @@ class Settings(BaseSettings):
             raise ValueError("Required setting cannot be empty")
         return value.strip()
 
+    @model_validator(mode="after")
+    def validate_initial_admin_credentials(self) -> "Settings":
+        if (self.initial_admin_email is None) != (self.initial_admin_password is None):
+            raise ValueError(
+                "INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD must be configured together"
+            )
+        return self
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -95,7 +105,10 @@ class Settings(BaseSettings):
     @property
     def allowed_extensions(self) -> set[str]:
         """Lowercase extensions including dot prefix."""
-        return {f".{ext.strip().lower().lstrip('.')}" for ext in self.allowed_upload_extensions.split(",")}
+        return {
+            f".{ext.strip().lower().lstrip('.')}"
+            for ext in self.allowed_upload_extensions.split(",")
+        }
 
 
 @lru_cache

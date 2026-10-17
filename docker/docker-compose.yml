@@ -1,5 +1,5 @@
 # Optional: run MySQL in Docker instead of local MySQL.
-# If you already use local MySQL on port 3306 (root/mysql/school_db), do NOT start the db service —
+# If you already use local MySQL on port 3306, do NOT start the db service —
 # run only the API locally: uvicorn app.main:app --reload
 services:
   db:
@@ -7,14 +7,14 @@ services:
     container_name: school_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: mysql
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env or the environment}
       MYSQL_DATABASE: school_db
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - school_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pmysql"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$${MYSQL_ROOT_PASSWORD}\""]
       interval: 10s
       timeout: 5s
       retries: 5

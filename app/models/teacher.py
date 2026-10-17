@@ -1,17 +1,17 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import BIGINT_PK, Base, TimestampMixin
 from app.models.enums import PaymentStatus, SalaryStatus, TeacherStatus
 
 
 class Teacher(Base, TimestampMixin):
     __tablename__ = "teachers"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     user_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("users.id"),
@@ -58,7 +58,7 @@ class TeacherAttendance(Base):
         UniqueConstraint("teacher_id", "attendance_date", name="uq_teacher_attendance_date"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     teacher_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("teachers.id"),
@@ -75,7 +75,7 @@ class TeacherAttendance(Base):
 class TeacherSalary(Base):
     __tablename__ = "teacher_salary"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     teacher_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("teachers.id"),
@@ -102,7 +102,7 @@ class TeacherSalaryPayment(Base):
         UniqueConstraint("teacher_id", "payment_month", name="uq_teacher_payment_month"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     teacher_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("teachers.id"),

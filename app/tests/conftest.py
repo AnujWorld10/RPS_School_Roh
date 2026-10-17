@@ -11,6 +11,8 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-32chars-min")
 os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("INITIAL_ADMIN_EMAIL", "test-admin@school.com")
+os.environ.setdefault("INITIAL_ADMIN_PASSWORD", "TestAdmin@123")
 
 from app.core.config import get_settings
 from app.db.base import Base
@@ -20,10 +22,14 @@ from app.main import app
 get_settings.cache_clear()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def engine():
     settings = get_settings()
-    connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+    connect_args = (
+        {"check_same_thread": False}
+        if settings.database_url.startswith("sqlite")
+        else {}
+    )
     test_engine = create_engine(
         settings.database_url,
         connect_args=connect_args,
@@ -71,8 +77,8 @@ def auth_headers(client):
     response = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
-            "password": "SuperAdmin@123",
+            "email": "test-admin@school.com",
+            "password": "TestAdmin@123",
         },
     )
     if response.status_code != 200:

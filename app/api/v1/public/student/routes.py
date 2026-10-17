@@ -3,13 +3,14 @@ Public student inquiry APIs (no authentication required).
 
 Endpoints:
 - POST /inquiry — submit new inquiry
-- GET  /inquiry/status/{inquiry_code} — track status
+- GET  /inquiry/status/{inquiry_code} — track status with parent verification headers
 - PUT  /inquiry/update — modify inquiry with verification
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi import APIRouter, Depends, Form, Header, Request, status
+from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AuthenticationException
@@ -52,15 +53,21 @@ def submit_student_inquiry(
 @router.get(
     "/inquiry/status/{inquiry_code}",
     summary="Check inquiry status",
-    description="Parents use inquiry_code from submission email/SMS to track progress.",
+    description="Requires the parent email and mobile number submitted with the inquiry.",
 )
 def get_inquiry_status(
     inquiry_code: str,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
+    email: Annotated[EmailStr, Header(alias="X-Parent-Email")],
+    parent_mobile: Annotated[str, Header(alias="X-Parent-Mobile")],
 ):
     """Return current status, rejection reason, and status timeline."""
-    inquiry = InquiryService(db).get_public_status(inquiry_code)
+    inquiry = InquiryService(db).get_public_status(
+        inquiry_code,
+        str(email),
+        parent_mobile,
+    )
     return success_response(
         "Inquiry status fetched successfully",
         to_public_status_response(inquiry).model_dump(),

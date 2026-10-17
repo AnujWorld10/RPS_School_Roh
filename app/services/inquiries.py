@@ -117,12 +117,20 @@ class InquiryService:
             )
             return inquiry
 
-    def get_public_status(self, inquiry_code: str) -> StudentInquiry:
-        """Return inquiry with history for parent status check (no staff fields)."""
-        normalized_code = inquiry_code.strip().upper()
-        inquiry = self.repo.get_by_code_with_history(normalized_code)
+    def get_public_status(
+        self,
+        inquiry_code: str,
+        email: str,
+        parent_mobile: str,
+    ) -> StudentInquiry:
+        """Return inquiry status only after verifying the applicant's contact details."""
+        inquiry = self.repo.verify_parent_credentials(
+            inquiry_code.strip().upper(),
+            email,
+            parent_mobile.strip(),
+        )
         if not inquiry:
-            raise NotFoundException("Inquiry not found")
+            raise AuthenticationException("Invalid inquiry credentials")
         return inquiry
 
     def update_public_inquiry(
@@ -280,7 +288,13 @@ class InquiryService:
                 return _apply()
         return _apply()
 
-    def start_review(self, inquiry_id: int, actor_id: int, request: Request, notes: str | None) -> StudentInquiry:
+    def start_review(
+        self,
+        inquiry_id: int,
+        actor_id: int,
+        request: Request,
+        notes: str | None,
+    ) -> StudentInquiry:
         """Admin: PENDING → UNDER_REVIEW."""
         return self.transition_status(
             inquiry_id,
@@ -290,7 +304,13 @@ class InquiryService:
             change_reason=notes or "Review started",
         )
 
-    def mark_processing(self, inquiry_id: int, actor_id: int, request: Request, notes: str | None) -> StudentInquiry:
+    def mark_processing(
+        self,
+        inquiry_id: int,
+        actor_id: int,
+        request: Request,
+        notes: str | None,
+    ) -> StudentInquiry:
         """Admin: UNDER_REVIEW → PROCESSING."""
         return self.transition_status(
             inquiry_id,

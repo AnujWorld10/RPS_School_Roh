@@ -36,8 +36,8 @@ def save_upload_file(upload: UploadFile, subdirectory: str) -> tuple[str, str]:
             field="file",
         )
 
-    content = upload.file.read()
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    content = upload.file.read(max_bytes + 1)
     if len(content) > max_bytes:
         raise ValidationException(
             f"File exceeds maximum size of {settings.max_upload_size_mb} MB",

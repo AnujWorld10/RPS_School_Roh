@@ -10,14 +10,13 @@ from typing import TYPE_CHECKING
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import BIGINT_PK, Base, TimestampMixin
 from app.models.enums import AdmissionStatus, DocumentVerificationStatus
 
 if TYPE_CHECKING:
     from app.models.class_model import Class
     from app.models.student import Student
     from app.models.student_inquiry import StudentInquiry
-    from app.models.user import User
 
 
 class InquiryAdmission(Base, TimestampMixin):
@@ -35,7 +34,7 @@ class InquiryAdmission(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BIGINT_PK,
         primary_key=True,
         autoincrement=True,
         comment="Internal surrogate primary key",
@@ -46,7 +45,7 @@ class InquiryAdmission(Base, TimestampMixin):
         comment="Business ID e.g. ADM202600001",
     )
     inquiry_id: Mapped[int] = mapped_column(
-        BigInteger,
+        BIGINT_PK,
         ForeignKey("student_inquiries.id", ondelete="CASCADE"),
         nullable=False,
         comment="FK to originating student inquiry",
@@ -120,7 +119,7 @@ class AdmissionDocument(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BIGINT_PK,
         primary_key=True,
         autoincrement=True,
         comment="Surrogate primary key",
@@ -178,7 +177,7 @@ class StudentAdmission(Base, TimestampMixin):
         UniqueConstraint("student_id", "academic_year", name="uq_student_admission_year"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     student_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("students.id"),
@@ -194,7 +193,11 @@ class StudentAdmission(Base, TimestampMixin):
         index=True,
     )
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    approved_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    approved_by: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id"),
+        nullable=True,
+    )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -16,7 +16,7 @@ INQUIRY_CODE_PREFIX = "INQ"
 
 def generate_inquiry_identifiers(session: Session) -> tuple[str, int]:
     """
-    Allocate the next inquiry_code and serial_number for the current calendar year.
+    Allocate the next globally unique serial and include the current year in its code.
 
     Args:
         session: Active SQLAlchemy session (caller owns transaction).
@@ -30,11 +30,8 @@ def generate_inquiry_identifiers(session: Session) -> tuple[str, int]:
         'INQ202600001'
     """
     year = datetime.now(UTC).year
-    # Serial is scoped per year so codes remain readable and sortable.
     max_serial = session.scalar(
-        select(func.coalesce(func.max(StudentInquiry.serial_number), 0)).where(
-            StudentInquiry.inquiry_code.like(f"{INQUIRY_CODE_PREFIX}{year}%")
-        )
+        select(func.coalesce(func.max(StudentInquiry.serial_number), 0))
     )
     serial_number = int(max_serial or 0) + 1
     inquiry_code = f"{INQUIRY_CODE_PREFIX}{year}{serial_number:05d}"

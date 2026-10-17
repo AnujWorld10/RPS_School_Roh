@@ -222,9 +222,11 @@ alembic upgrade head
 On startup, the application runs `seed_database()` which creates:
 
 - Default roles and permissions
-- **Super admin user** (if not exists):
-  - Email: `superadmin@school.com` (legacy seed: `superadmin@school.local` also accepted at login)
-  - Password: `SuperAdmin@123`
+- **Initial super admin** only when `INITIAL_ADMIN_EMAIL` and
+  `INITIAL_ADMIN_PASSWORD` are both configured. Use a unique strong password and
+  remove both settings after the account is created. Existing installations can
+  rotate the legacy seeded super admin by configuring those values for one startup.
+  No default credentials are shipped.
 
 ### 3.6 Run Locally
 
@@ -427,7 +429,7 @@ Standard RBAC junction model. Permission code format: `module.action` (e.g. `stu
 |--------|------|-------------|-------------|
 | id | BIGINT | PK | |
 | inquiry_code | VARCHAR(20) | UNIQUE | e.g. INQ202600001 |
-| serial_number | INT | UNIQUE | Year-scoped serial |
+| serial_number | INT | UNIQUE | Globally monotonic serial |
 | first_name, middle_name, last_name | VARCHAR | | Student name |
 | gender | VARCHAR(20) | | |
 | father_name | VARCHAR(200) | | |
@@ -605,7 +607,7 @@ Base: `/api/v1` unless noted. **Auth:** None | Bearer | Permission code.
 | Method | URL | Auth | Purpose |
 |--------|-----|------|---------|
 | POST | `/public/student/inquiry` | None | Submit inquiry |
-| GET | `/public/student/inquiry/status/{inquiry_code}` | None | Track status |
+| GET | `/public/student/inquiry/status/{inquiry_code}` | Parent email/mobile headers | Track status |
 | PUT | `/public/student/inquiry/update` | None | Update inquiry (verified) |
 | POST | `/public/student/admission` | None | Submit admission (form) |
 
@@ -639,6 +641,14 @@ Content-Type: application/json
 }
 ```
 
+**Public status lookup** requires both contact headers from inquiry submission:
+
+```http
+GET /api/v1/public/student/inquiry/status/INQ202600001
+X-Parent-Email: parent@example.com
+X-Parent-Mobile: +911234567890
+```
+
 #### Auth
 
 | Method | URL | Auth | Permission |
@@ -651,10 +661,10 @@ Content-Type: application/json
 | POST | `/auth/logout` | Bearer | Any active user |
 | GET | `/auth/verify-token` | Bearer | Any active user |
 
-**Login body:**
+**Login body** (use the configured bootstrap credentials):
 
 ```json
-{ "email": "superadmin@school.com", "password": "SuperAdmin@123" }
+{ "email": "configured-admin@example.com", "password": "configured-strong-password" }
 ```
 
 **Login success `data`:**
@@ -784,7 +794,7 @@ sequenceDiagram
 ```json
 {
   "sub": "1",
-  "email": "superadmin@school.com",
+  "email": "admin@example.com",
   "roles": ["ADMIN"],
   "permissions": ["students.create", "..."],
   "type": "access",
@@ -799,14 +809,17 @@ Refresh tokens include `type: "refresh"` and `jti`; only a **hash** is stored in
 - **Roles:** SUPER_ADMIN, ADMIN, PRINCIPAL, TEACHER, ACCOUNTANT, ADMISSION_OFFICER, STUDENT, PARENT
 - **Permissions:** Fine-grained `module.action` codes
 - **Dependencies:** `get_current_user()`, `require_roles()`, `require_permissions()`
+- Teacher salary reads and payments have separate permissions; salary access is
+  limited to finance and administrative roles.
 
 Seed data: `app/core/permissions.py`
 
-### 8.4 Default User
+### 8.4 Initial Admin
 
-| Email | Password | Role |
-|-------|----------|------|
-| superadmin@school.com | SuperAdmin@123 | SUPER_ADMIN |
+The first SUPER_ADMIN is created only when both `INITIAL_ADMIN_EMAIL` and
+`INITIAL_ADMIN_PASSWORD` are configured. There are no built-in default credentials.
+For upgrades with the former built-in account, configure its email and a new strong
+password for one startup to rotate its credentials, then remove both settings.
 
 Registration requires existing SUPER_ADMIN or ADMIN.
 
@@ -1180,7 +1193,7 @@ gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000
 The repository `README.md` is the operational entry point for developers. It should remain consistent with this technical documentation:
 
 - **Quick Start**: venv, install, `alembic upgrade head`, run with `uvicorn app.main:app --reload`
-- **Default login**: `superadmin@school.com` / `SuperAdmin@123`
+- **Initial admin**: configured via `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD`
 - **Logging**: daily files in `logs/` + cleanup script `python scripts/cleanup_logs.py`
 - **References**: link to `docs/TECHNICAL_DOCUMENTATION.md` and OpenAPI `/docs`
 

@@ -34,9 +34,10 @@ from app.services.audit import AuditService
 
 
 def _collect_roles_and_permissions(user: User) -> tuple[list[str], list[str]]:
-    roles = [role.code for role in user.roles if role.is_active]
+    active_roles = [role for role in user.roles if role.is_active]
+    roles = [role.code for role in active_roles]
     permissions: set[str] = set()
-    for role in user.roles:
+    for role in active_roles:
         for permission in role.permissions:
             permissions.add(permission.code)
     return roles, sorted(permissions)
@@ -93,13 +94,7 @@ class AuthService:
         if user.status != UserStatus.ACTIVE.value:
             raise AuthenticationException("User account is not active")
 
-        roles, permissions = _collect_roles_and_permissions(user)
-        access_token = create_access_token(
-            user_id=user.id,
-            email=user.email,
-            roles=roles,
-            permissions=permissions,
-        )
+        access_token = create_access_token(user_id=user.id)
         refresh_token, _jti = create_refresh_token(user_id=user.id)
 
         with transaction(self.session):
@@ -142,13 +137,7 @@ class AuthService:
         if not user or user.status != UserStatus.ACTIVE.value:
             raise TokenInvalidException("Refresh token is invalid or revoked")
 
-        roles, permissions = _collect_roles_and_permissions(user)
-        access_token = create_access_token(
-            user_id=user.id,
-            email=user.email,
-            roles=roles,
-            permissions=permissions,
-        )
+        access_token = create_access_token(user_id=user.id)
         return {
             "access_token": access_token,
             "token_type": "bearer",

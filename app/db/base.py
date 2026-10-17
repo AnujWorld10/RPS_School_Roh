@@ -1,11 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
     pass
+
+
+BIGINT_PK = BigInteger().with_variant(Integer, "sqlite")
 
 
 class TimestampMixin:

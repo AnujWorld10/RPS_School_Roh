@@ -21,7 +21,7 @@ def get_current_user(
     if credentials is None or not credentials.credentials:
         raise TokenInvalidException("Valid access token is required")
     payload = decode_token(credentials.credentials)
-    if payload.get("type") != "access":
+    if payload.get("type") not in (None, "access"):
         raise TokenInvalidException("Valid access token is required")
     user = AuthService(db).get_current_user(int(payload["sub"]))
     return user

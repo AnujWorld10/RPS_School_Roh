@@ -101,7 +101,11 @@ def assign_subject(
     current_user: Annotated[User, Depends(require_permissions("teachers.update"))],
 ):
     TeacherService(db).assign_subject(teacher_id, payload, current_user.id, request)
-    return success_response("Subject assigned successfully", {"subject_id": payload.subject_id}, request)
+    return success_response(
+        "Subject assigned successfully",
+        {"subject_id": payload.subject_id},
+        request,
+    )
 
 
 @router.get("/{teacher_id}/subject")
@@ -164,7 +168,7 @@ def get_teacher_salary(
     teacher_id: int,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_permissions("teachers.read"))],
+    _: Annotated[User, Depends(require_permissions("teachers.salary.read"))],
 ):
     salary = TeacherService(db).get_salary(teacher_id)
     return success_response(

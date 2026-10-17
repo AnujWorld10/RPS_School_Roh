@@ -164,6 +164,9 @@ This API will be publicly available.
 
 Public API.
 
+The request must include the `X-Parent-Email` and `X-Parent-Mobile` headers matching
+the contact details submitted with the inquiry.
+
 Student can check:
 
 * Inquiry Status

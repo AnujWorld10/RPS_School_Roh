@@ -1,7 +1,5 @@
 """Integration tests for public student inquiry APIs."""
 
-import pytest
-
 INQUIRY_PAYLOAD = {
     "first_name": "Aarav",
     "middle_name": "Kumar",
@@ -36,13 +34,33 @@ def test_public_status_check(client):
     create_resp = client.post("/api/v1/public/student/inquiry", json=INQUIRY_PAYLOAD)
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
 
-    status_resp = client.get(f"/api/v1/public/student/inquiry/status/{inquiry_code}")
+    status_resp = client.get(
+        f"/api/v1/public/student/inquiry/status/{inquiry_code}",
+        headers={
+            "X-Parent-Email": INQUIRY_PAYLOAD["email"],
+            "X-Parent-Mobile": INQUIRY_PAYLOAD["parent_mobile"],
+        },
+    )
     assert status_resp.status_code == 200
     status_body = status_resp.json()["data"]
     assert status_body["inquiry_code"] == inquiry_code
     assert status_body["status"] == "PENDING"
     assert len(status_body["status_timeline"]) >= 1
     assert status_body["status_timeline"][0]["to_status"] == "PENDING"
+
+
+def test_public_status_requires_matching_contact_headers(client):
+    create_resp = client.post("/api/v1/public/student/inquiry", json=INQUIRY_PAYLOAD)
+    inquiry_code = create_resp.json()["data"]["inquiry_code"]
+
+    response = client.get(
+        f"/api/v1/public/student/inquiry/status/{inquiry_code}",
+        headers={
+            "X-Parent-Email": "wrong@example.com",
+            "X-Parent-Mobile": INQUIRY_PAYLOAD["parent_mobile"],
+        },
+    )
+    assert response.status_code == 401
 
 
 def test_public_update_requires_credentials(client):
@@ -75,5 +93,11 @@ def test_public_update_success(client):
     body = response.json()
     assert body["success"] is True
     # Name is not in public status response; verify via staff-less re-fetch
-    status_resp = client.get(f"/api/v1/public/student/inquiry/status/{inquiry_code}")
+    status_resp = client.get(
+        f"/api/v1/public/student/inquiry/status/{inquiry_code}",
+        headers={
+            "X-Parent-Email": INQUIRY_PAYLOAD["email"],
+            "X-Parent-Mobile": INQUIRY_PAYLOAD["parent_mobile"],
+        },
+    )
     assert status_resp.status_code == 200

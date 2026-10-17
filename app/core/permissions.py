@@ -43,6 +43,7 @@ DEFAULT_PERMISSIONS = [
     ("teachers.create", "teachers", "create"),
     ("teachers.read", "teachers", "read"),
     ("teachers.update", "teachers", "update"),
+    ("teachers.salary.read", "teachers", "salary.read"),
     ("teachers.salary.pay", "teachers", "salary.pay"),
 ]
 
@@ -66,7 +67,7 @@ ROLE_PERMISSION_MAP: dict[str, list[str]] = {
         "teachers.read",
     ],
     "TEACHER": ["classes.read", "students.read", "teachers.read", "interviews.read"],
-    "ACCOUNTANT": ["teachers.read", "teachers.salary.pay"],
+    "ACCOUNTANT": ["teachers.read", "teachers.salary.read", "teachers.salary.pay"],
     "ADMISSION_OFFICER": [
         "classes.read",
         "inquiries.create",

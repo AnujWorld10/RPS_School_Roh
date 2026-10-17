@@ -25,11 +25,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import BIGINT_PK, Base, TimestampMixin
 from app.models.enums import Gender, InquiryStatus
 
 if TYPE_CHECKING:
+    from app.models.admission import InquiryAdmission
     from app.models.class_model import Class
+    from app.models.interview import InterviewSchedule
     from app.models.user import User
 
 
@@ -53,7 +55,7 @@ class StudentInquiry(Base, TimestampMixin):
 
     # --- Primary key ---
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BIGINT_PK,
         primary_key=True,
         autoincrement=True,
         comment="Internal surrogate primary key",
@@ -68,7 +70,7 @@ class StudentInquiry(Base, TimestampMixin):
     serial_number: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        comment="Monotonic serial used when generating inquiry_code for the academic year",
+        comment="Globally unique monotonic serial used to generate inquiry_code",
     )
 
     # --- Student profile (from public form) ---
@@ -213,7 +215,7 @@ class InquiryStatusHistory(Base):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BIGINT_PK,
         primary_key=True,
         autoincrement=True,
         comment="Surrogate primary key for this history row",

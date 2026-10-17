@@ -10,3 +10,11 @@ def test_login_invalid_credentials(client):
 def test_me_requires_token(client):
     response = client.get("/api/v1/auth/me")
     assert response.status_code == 401
+
+
+def test_compact_access_token_authenticates(client, auth_headers):
+    token = auth_headers["Authorization"].removeprefix("Bearer ")
+
+    assert len(token) <= 140
+    response = client.get("/api/v1/auth/me", headers=auth_headers)
+    assert response.status_code == 200

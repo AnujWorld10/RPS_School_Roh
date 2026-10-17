@@ -3,14 +3,16 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.permissions import DEFAULT_PERMISSIONS, DEFAULT_ROLES, ROLE_PERMISSION_MAP
-from app.core.security import hash_password
+from app.core.security import hash_password, validate_password_strength
 from app.db.session import SessionLocal
 from app.models.class_model import Class
 from app.models.enums import ClassStatus, UserStatus
 from app.models.permission import Permission, RolePermission
 from app.models.role import Role, UserRole
 from app.models.user import User
+from app.repositories.tokens import RefreshTokenRepository
 
 DEFAULT_CLASSES: list[tuple[str, str | None, str, int]] = [
     ("1st Grade", "A", "2025-26", 40),
@@ -46,6 +48,7 @@ def seed_database(session: Session | None = None) -> None:
     except Exception:
         session.rollback()
         logger.exception("database seed failed")
+        raise
     finally:
         if owns_session:
             session.close()
@@ -85,26 +88,40 @@ def _seed_roles_and_permissions(session: Session) -> None:
 
 
 def _seed_super_admin(session: Session) -> None:
-    # Use a TLD accepted by strict validators; AppEmail also allows *.local for dev.
-    email = "superadmin@school.com"
-    user = session.scalar(select(User).where(User.email == email))
-    if user:
+    settings = get_settings()
+    if settings.initial_admin_email is None or settings.initial_admin_password is None:
+        logger.info("initial admin credentials are not configured; skipping admin bootstrap")
         return
+
+    email = str(settings.initial_admin_email)
+    password = settings.initial_admin_password.get_secret_value()
+    validate_password_strength(password)
     role = session.scalar(select(Role).where(Role.code == "SUPER_ADMIN"))
     if not role:
         return
+
+    user = session.scalar(select(User).where(User.email == email))
+    if user:
+        if any(existing_role.id == role.id for existing_role in user.roles):
+            user.password_hash = hash_password(password)
+            user.status = UserStatus.ACTIVE.value
+            session.add(user)
+            RefreshTokenRepository(session).revoke_all_for_user(user.id)
+            logger.info("updated configured initial super admin credentials: %s", email)
+        return
+
     user = User(
         first_name="Super",
         last_name="Admin",
         email=email,
         phone=None,
-        password_hash=hash_password("SuperAdmin@123"),
+        password_hash=hash_password(password),
         status=UserStatus.ACTIVE.value,
     )
     session.add(user)
     session.flush()
     session.add(UserRole(user_id=user.id, role_id=role.id))
-    logger.info("seeded default super admin user: %s", email)
+    logger.info("seeded initial super admin user: %s", email)
 
 
 def _seed_classes(session: Session) -> None:

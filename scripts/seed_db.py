@@ -1,7 +1,7 @@
-"""Run database seed manually: roles, permissions, super admin user."""
+"""Run database seed manually: roles, permissions, and configured initial admin."""
 
 from app.db.seed import seed_database
 
 if __name__ == "__main__":
     seed_database()
-    print("Seed completed. Login: superadmin@school.com / SuperAdmin@123")
+    print("Seed completed.")

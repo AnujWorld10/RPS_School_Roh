@@ -62,7 +62,16 @@ Edit `.env` — default local connection:
 ```env
 DATABASE_URL=mysql+pymysql://root:mysql@localhost:3306/school_db
 JWT_SECRET_KEY=your-long-random-secret-key-here
+INITIAL_ADMIN_EMAIL=admin@example.com
+INITIAL_ADMIN_PASSWORD=<unique-strong-password>
 ```
+
+`INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` must be configured together.
+The password must meet the application's strength requirements. The first startup
+creates this super admin; remove both settings after the account is created.
+For upgrades from versions that created `superadmin@school.com` with a built-in
+password, set `INITIAL_ADMIN_EMAIL` to that address and provide a new strong
+password for one startup; remove both settings afterward.
 
 ### 3. Install and migrate
 
@@ -90,28 +99,15 @@ uvicorn app.main:app --reload
 
 ---
 
-## Default Login
-
-On first startup, a super admin user is seeded automatically:
-
-| Field | Value |
-|-------|-------|
-| Email | `superadmin@school.com` |
-| Password | `SuperAdmin@123` |
-
-If you seeded earlier with `superadmin@school.local`, that address still works for login, or update the row in MySQL:
-
-```sql
-UPDATE users SET email = 'superadmin@school.com' WHERE email = 'superadmin@school.local';
-```
+## Initial Admin Login
 
 ```http
 POST /api/v1/auth/login
 Content-Type: application/json
 
 {
-  "email": "superadmin@school.com",
-  "password": "SuperAdmin@123"
+  "email": "the-email-configured-in-INITIAL_ADMIN_EMAIL",
+  "password": "the-password-configured-in-INITIAL_ADMIN_PASSWORD"
 }
 ```
 
@@ -196,6 +192,8 @@ python scripts/cleanup_logs.py
 ---
 
 ## Docker (optional)
+
+Set `MYSQL_ROOT_PASSWORD` in the project `.env` file before starting Compose.
 
 ```powershell
 docker compose -f docker/docker-compose.yml up -d
