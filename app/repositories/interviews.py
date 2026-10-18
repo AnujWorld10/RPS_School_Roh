@@ -18,7 +18,10 @@ class InterviewRepository(BaseRepository[InterviewSchedule]):
         stmt = (
             select(InterviewSchedule)
             .where(InterviewSchedule.inquiry_id == inquiry_id)
-            .order_by(InterviewSchedule.schedule_date.desc(), InterviewSchedule.schedule_time.desc())
+            .order_by(
+                InterviewSchedule.schedule_date.desc(),
+                InterviewSchedule.schedule_time.desc(),
+            )
         )
         return list(self.session.scalars(stmt).all())
 

@@ -1,6 +1,5 @@
 """Integration tests for auth success paths and token handling."""
 
-import pytest
 
 
 def test_login_success_returns_tokens(client):

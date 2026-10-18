@@ -1,8 +1,11 @@
 import sys
 from datetime import datetime
+
 sys.path.insert(0, r'D:\RPS_rough\RPS_School_Roh')
 from fastapi.testclient import TestClient
+
 from app.main import app
+
 
 def get_unique_inquiry_payload(suffix=""):
     if not suffix:

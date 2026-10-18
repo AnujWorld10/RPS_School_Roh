@@ -1,12 +1,5 @@
 """Integration and unit tests for interview scheduling and results workflow."""
 
-from datetime import date, timedelta
-from unittest.mock import MagicMock
-
-import pytest
-
-from app.models.enums import InterviewResult, InquiryStatus
-
 
 def test_interview_scheduling_requires_processing_status(client, db_session):
     """Scheduling interview should only work when inquiry is in PROCESSING status."""
@@ -27,9 +20,14 @@ def test_interview_scheduling_requires_processing_status(client, db_session):
     }
     create_resp = client.post("/api/v1/public/student/inquiry", json=payload)
     assert create_resp.status_code == 201
-    inquiry_id = db_session.query(__import__("app.models.student_inquiry", fromlist=["StudentInquiry"]).StudentInquiry).filter_by(
-        inquiry_code=create_resp.json()["data"]["inquiry_code"]
-    ).first().id
+    from app.models.student_inquiry import StudentInquiry
+
+    inquiry = (
+        db_session.query(StudentInquiry)
+        .filter_by(inquiry_code=create_resp.json()["data"]["inquiry_code"])
+        .first()
+    )
+    assert inquiry is not None
 
     # Inquiry is PENDING, so scheduling should eventually fail (when implemented)
     # For now, verify that inquiry exists
@@ -58,7 +56,6 @@ def test_interview_requires_mode_and_date(db_session, auth_headers):
 
 def test_interview_scheduled_date_cannot_be_in_past(db_session, auth_headers):
     """Interview date cannot be scheduled in the past."""
-    past_date = (date.today() - timedelta(days=1)).isoformat()
     # Would fail validation
 
 

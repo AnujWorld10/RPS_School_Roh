@@ -1,7 +1,6 @@
 """Integration tests for inquiry validation, error handling, and edge cases."""
 
-import pytest
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 
 def get_unique_validation_payload(suffix=""):
@@ -316,8 +315,8 @@ def test_inquiry_update_to_locked_status_fails(client, db_session, auth_headers)
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
 
     # Manually mark as REJECTED in DB
-    from app.repositories.inquiries import StudentInquiryRepository
     from app.models.enums import InquiryStatus
+    from app.repositories.inquiries import StudentInquiryRepository
 
     repo = StudentInquiryRepository(db_session)
     inquiry = repo.get_by_code_with_history(inquiry_code)

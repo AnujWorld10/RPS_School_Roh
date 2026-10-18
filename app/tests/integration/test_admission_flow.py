@@ -1,13 +1,12 @@
 """Integration tests for the admission workflow: inquiry → interview → admission."""
 
-import pytest
-from datetime import date, datetime
+from time import time_ns
 
 
 def get_unique_admission_payload(suffix=""):
     """Generate unique inquiry payload for admission tests."""
     if not suffix:
-        suffix = datetime.now().strftime("%s%f")[5:12]
+        suffix = f"{time_ns() % 10_000_000:07d}"
     return {
         "first_name": f"John{suffix}",
         "middle_name": "Paul",
@@ -51,12 +50,12 @@ def test_admission_flow_from_inquiry_creation_to_submission(client, db_session, 
 
     # Step 3: Get inquiry ID from DB for admin operations
     from app.repositories.inquiries import StudentInquiryRepository
+
     repo = StudentInquiryRepository(db_session)
     inquiry = repo.get_by_code_with_history(inquiry_code)
     assert inquiry is not None
-    inquiry_id = inquiry.id
 
-    # Step 4: Admin transitions inquiry status: PENDING → UNDER_REVIEW → PROCESSING → INTERVIEW_SCHEDULED
+    # Step 4: Admin transitions inquiry status through review and interview scheduling.
     # Note: These are admin operations and would typically be done via staff endpoints.
     # For now, we test that the inquiry exists and can be retrieved.
     assert inquiry.status in ["PENDING", "UNDER_REVIEW", "PROCESSING"]
@@ -66,14 +65,14 @@ def test_admission_flow_from_inquiry_creation_to_submission(client, db_session, 
         "/api/v1/public/student/admission",
         data={
             "inquiry_code": inquiry_code,
-            "email": INQUIRY_PAYLOAD["email"],
-            "parent_mobile": INQUIRY_PAYLOAD["parent_mobile"],
+            "email": payload["email"],
+            "parent_mobile": payload["parent_mobile"],
             "class_id": 1,  # Assuming class 1 exists
             "academic_year": "2024-2025",
             "section": "A",
         },
     )
-    # If inquiry is in INTERVIEW_PASS status, should succeed; otherwise may fail depending on status rules
+    # Submission can succeed after interview pass; otherwise it may fail based on status.
     # For now, we just verify the endpoint is reachable and validates credentials
     if admission_resp.status_code == 201:
         admission_data = admission_resp.json()["data"]
@@ -103,7 +102,7 @@ def test_admission_submission_with_invalid_credentials_fails(client):
         data={
             "inquiry_code": inquiry_code,
             "email": "wrong@example.com",  # Mismatch
-            "parent_mobile": INQUIRY_PAYLOAD["parent_mobile"],
+            "parent_mobile": payload["parent_mobile"],
             "class_id": 1,
             "academic_year": "2024-2025",
         },
@@ -128,7 +127,7 @@ def test_admission_submission_with_wrong_mobile_fails(client):
         "/api/v1/public/student/admission",
         data={
             "inquiry_code": inquiry_code,
-            "email": INQUIRY_PAYLOAD["email"],
+            "email": payload["email"],
             "parent_mobile": "+911111111111",  # Mismatch
             "class_id": 1,
             "academic_year": "2024-2025",
@@ -154,8 +153,8 @@ def test_admission_submission_requires_all_fields(client):
         "/api/v1/public/student/admission",
         data={
             "inquiry_code": inquiry_code,
-            "email": INQUIRY_PAYLOAD["email"],
-            "parent_mobile": INQUIRY_PAYLOAD["parent_mobile"],
+            "email": payload["email"],
+            "parent_mobile": payload["parent_mobile"],
             "academic_year": "2024-2025",
             # Missing class_id
         },
@@ -231,7 +230,6 @@ def test_required_documents_lists_all_types(client):
     assert body["success"] is True
     data = body["data"]
     # Should include document types like progress_report, transfer_certificate, etc.
-    doc_types = ["progress_report", "transfer_certificate", "migration_certificate", "character_certificate"]
     # At least some types should be present
     assert isinstance(data, (dict, list))
 
@@ -240,10 +238,10 @@ def test_inquiry_update_with_valid_credentials_succeeds(client):
     """
     PUT /public/student/inquiry/update with matching credentials updates inquiry.
     """
-    # Create inquiry
+    payload = get_unique_admission_payload()
     create_resp = client.post(
         "/api/v1/public/student/inquiry",
-        json=INQUIRY_PAYLOAD,
+        json=payload,
     )
     assert create_resp.status_code == 201
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
@@ -253,8 +251,8 @@ def test_inquiry_update_with_valid_credentials_succeeds(client):
         "/api/v1/public/student/inquiry/update",
         json={
             "inquiry_code": inquiry_code,
-            "email": INQUIRY_PAYLOAD["email"],
-            "parent_mobile": INQUIRY_PAYLOAD["parent_mobile"],
+            "email": payload["email"],
+            "parent_mobile": payload["parent_mobile"],
             "first_name": "Jonathan",  # Updated name
         },
     )
@@ -267,10 +265,10 @@ def test_inquiry_update_with_wrong_credentials_fails(client):
     """
     PUT /public/student/inquiry/update with wrong credentials returns 401.
     """
-    # Create inquiry
+    payload = get_unique_admission_payload()
     create_resp = client.post(
         "/api/v1/public/student/inquiry",
-        json=INQUIRY_PAYLOAD,
+        json=payload,
     )
     assert create_resp.status_code == 201
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
@@ -281,7 +279,7 @@ def test_inquiry_update_with_wrong_credentials_fails(client):
         json={
             "inquiry_code": inquiry_code,
             "email": "wrong@example.com",
-            "parent_mobile": INQUIRY_PAYLOAD["parent_mobile"],
+            "parent_mobile": payload["parent_mobile"],
             "first_name": "Jonathan",
         },
     )
@@ -292,10 +290,10 @@ def test_inquiry_status_timeline_records_transitions(client):
     """
     GET /public/student/inquiry/status/{code} shows status_timeline with transitions.
     """
-    # Create inquiry
+    payload = get_unique_admission_payload()
     create_resp = client.post(
         "/api/v1/public/student/inquiry",
-        json=INQUIRY_PAYLOAD,
+        json=payload,
     )
     assert create_resp.status_code == 201
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
@@ -315,19 +313,22 @@ def test_duplicate_inquiry_submission_on_same_data_fails(client):
     """
     POST /public/student/inquiry with duplicate name/dob returns conflict.
     """
-    # Submit first inquiry
+    payload = get_unique_admission_payload()
     create_resp1 = client.post(
         "/api/v1/public/student/inquiry",
-        json=INQUIRY_PAYLOAD,
+        json=payload,
     )
     assert create_resp1.status_code == 201
 
     # Try to submit duplicate (same name, father name, DOB)
     create_resp2 = client.post(
         "/api/v1/public/student/inquiry",
-        json=INQUIRY_PAYLOAD,  # Same data
+        json=payload,  # Same data
     )
     assert create_resp2.status_code == 409  # Conflict
     body = create_resp2.json()
     assert body["success"] is False
-    assert "already exists" in body.get("detail", "").lower() or "duplicate" in body.get("detail", "").lower()
+    assert (
+        "already exists" in body.get("detail", "").lower()
+        or "duplicate" in body.get("detail", "").lower()
+    )

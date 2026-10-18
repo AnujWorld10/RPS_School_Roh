@@ -45,8 +45,8 @@ class TestDuplicateInquiryDetection:
         repo = StudentInquiryRepository(db_session)
 
         # Create first inquiry
-        from app.utils.inquiry_ids import generate_inquiry_identifiers
         from app.models.student_inquiry import StudentInquiry
+        from app.utils.inquiry_ids import generate_inquiry_identifiers
 
         inquiry_code, serial_number = generate_inquiry_identifiers(db_session)
         inquiry1 = repo.create(
@@ -85,8 +85,8 @@ class TestDuplicateInquiryDetection:
         """Test that duplicate detection is case-insensitive."""
         repo = StudentInquiryRepository(db_session)
 
-        from app.utils.inquiry_ids import generate_inquiry_identifiers
         from app.models.student_inquiry import StudentInquiry
+        from app.utils.inquiry_ids import generate_inquiry_identifiers
 
         inquiry_code, serial_number = generate_inquiry_identifiers(db_session)
         inquiry1 = repo.create(
@@ -124,8 +124,8 @@ class TestDuplicateInquiryDetection:
         """Test that different names are not considered duplicates."""
         repo = StudentInquiryRepository(db_session)
 
-        from app.utils.inquiry_ids import generate_inquiry_identifiers
         from app.models.student_inquiry import StudentInquiry
+        from app.utils.inquiry_ids import generate_inquiry_identifiers
 
         inquiry_code, serial_number = generate_inquiry_identifiers(db_session)
         repo.create(
@@ -162,8 +162,8 @@ class TestDuplicateInquiryDetection:
         """Test that different DOB is not considered a duplicate."""
         repo = StudentInquiryRepository(db_session)
 
-        from app.utils.inquiry_ids import generate_inquiry_identifiers
         from app.models.student_inquiry import StudentInquiry
+        from app.utils.inquiry_ids import generate_inquiry_identifiers
 
         inquiry_code, serial_number = generate_inquiry_identifiers(db_session)
         repo.create(
@@ -200,8 +200,8 @@ class TestDuplicateInquiryDetection:
         """Test that REJECTED inquiries are excluded from duplicate detection."""
         repo = StudentInquiryRepository(db_session)
 
-        from app.utils.inquiry_ids import generate_inquiry_identifiers
         from app.models.student_inquiry import StudentInquiry
+        from app.utils.inquiry_ids import generate_inquiry_identifiers
 
         inquiry_code, serial_number = generate_inquiry_identifiers(db_session)
         repo.create(
@@ -238,8 +238,8 @@ class TestDuplicateInquiryDetection:
         """Test that INTERVIEW_FAIL inquiries are excluded from duplicate detection."""
         repo = StudentInquiryRepository(db_session)
 
-        from app.utils.inquiry_ids import generate_inquiry_identifiers
         from app.models.student_inquiry import StudentInquiry
+        from app.utils.inquiry_ids import generate_inquiry_identifiers
 
         inquiry_code, serial_number = generate_inquiry_identifiers(db_session)
         repo.create(
@@ -274,9 +274,10 @@ class TestDuplicateInquiryDetection:
 
     def test_service_raises_conflict_on_duplicate(self, db_session: Session, sample_inquiry_data):
         """Test that InquiryService raises ConflictException on duplicate."""
-        from app.utils.inquiry_ids import generate_inquiry_identifiers
-        from app.models.student_inquiry import StudentInquiry
         from unittest.mock import MagicMock
+
+        from app.models.student_inquiry import StudentInquiry
+        from app.utils.inquiry_ids import generate_inquiry_identifiers
 
         repo = StudentInquiryRepository(db_session)
 

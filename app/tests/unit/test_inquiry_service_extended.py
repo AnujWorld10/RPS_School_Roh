@@ -4,10 +4,8 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
-    AuthenticationException,
     BusinessRuleException,
     NotFoundException,
 )
@@ -44,8 +42,8 @@ def test_inquiry_status_history_recorded_on_creation(db_session):
     service = InquiryService(db_session)
     request_mock = MagicMock()
 
-    from app.schemas.inquiries import PublicInquiryCreateRequest
     from app.models.enums import Gender
+    from app.schemas.inquiries import PublicInquiryCreateRequest
 
     payload = PublicInquiryCreateRequest(
         first_name="History",
@@ -76,7 +74,6 @@ def test_inquiry_status_history_recorded_on_creation(db_session):
 def test_get_public_status_with_invalid_code_raises_not_found(db_session):
     """Test that get_public_status raises NotFoundException for invalid code."""
     service = InquiryService(db_session)
-    request_mock = MagicMock()
 
     with pytest.raises(NotFoundException):
         service.get_public_status("INVALID_CODE")
@@ -126,7 +123,12 @@ def test_start_review_transition_succeeds(db_session):
     service = InquiryService(db_session)
     request_mock = MagicMock()
 
-    updated = service.start_review(inquiry.id, actor_id=1, request=request_mock, notes="Starting review")
+    updated = service.start_review(
+        inquiry.id,
+        actor_id=1,
+        request=request_mock,
+        notes="Starting review",
+    )
     assert updated.status == InquiryStatus.UNDER_REVIEW.value
 
 
@@ -141,7 +143,12 @@ def test_mark_processing_transition_succeeds(db_session):
     assert updated.status == InquiryStatus.UNDER_REVIEW.value
 
     # Now mark as processing
-    processed = service.mark_processing(inquiry.id, actor_id=1, request=request_mock, notes="Processing")
+    processed = service.mark_processing(
+        inquiry.id,
+        actor_id=1,
+        request=request_mock,
+        notes="Processing",
+    )
     assert processed.status == InquiryStatus.PROCESSING.value
 
 
@@ -171,8 +178,8 @@ def test_audit_log_called_on_inquiry_create(db_session):
     service = InquiryService(db_session)
     request_mock = MagicMock()
 
-    from app.schemas.inquiries import PublicInquiryCreateRequest
     from app.models.enums import Gender
+    from app.schemas.inquiries import PublicInquiryCreateRequest
 
     payload = PublicInquiryCreateRequest(
         first_name="Audit",
