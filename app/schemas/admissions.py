@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import DocumentType
 from app.schemas.common import ORMModel
@@ -21,6 +21,22 @@ class InquiryAdmissionCreateRequest(BaseModel):
     blood_group: str | None = Field(default=None, max_length=10)
     reason_for_school_change: str | None = None
     notes: str | None = None
+
+    @field_validator(
+        "section",
+        "academic_year",
+        "permanent_address",
+        "temporary_address",
+        "nationality",
+        "disability",
+        "blood_group",
+        "reason_for_school_change",
+        "notes",
+        mode="before",
+    )
+    @classmethod
+    def strip_form_strings(cls, value: str | None) -> str | None:
+        return value.strip() if isinstance(value, str) else value
 
 
 class InquiryAdmissionUpdateRequest(BaseModel):

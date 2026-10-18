@@ -18,7 +18,12 @@ class InquiryAdmissionRepository(BaseRepository[InquiryAdmission]):
         stmt = select(InquiryAdmission).where(InquiryAdmission.inquiry_id == inquiry_id)
         return self.session.scalar(stmt)
 
-    def get_with_documents(self, admission_id: int) -> InquiryAdmission | None:
+    def get_with_documents(
+        self,
+        admission_id: int,
+        *,
+        for_update: bool = False,
+    ) -> InquiryAdmission | None:
         stmt = (
             select(InquiryAdmission)
             .where(InquiryAdmission.id == admission_id)
@@ -28,6 +33,8 @@ class InquiryAdmissionRepository(BaseRepository[InquiryAdmission]):
                 selectinload(InquiryAdmission.school_class),
             )
         )
+        if for_update:
+            stmt = stmt.with_for_update()
         return self.session.scalar(stmt)
 
     def list_filtered(
@@ -36,7 +43,9 @@ class InquiryAdmissionRepository(BaseRepository[InquiryAdmission]):
         status: str | None = None,
         academic_year: str | None = None,
     ) -> PaginatedResult:
-        stmt = select(InquiryAdmission)
+        stmt = select(InquiryAdmission).options(
+            selectinload(InquiryAdmission.documents),
+        )
         if status:
             stmt = stmt.where(InquiryAdmission.status == status)
         if academic_year:

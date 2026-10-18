@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.pagination import PaginatedResult, PaginationParams
 from app.models.class_model import Class
-from app.models.student import Student
 from app.models.enums import StudentStatus
+from app.models.student import Student
 from app.repositories.base import BaseRepository
 
 
@@ -42,7 +42,11 @@ class ClassRepository(BaseRepository[Class]):
             stmt = stmt.where(Class.status == status)
         return self.paginate(stmt, params)
 
-    def count_active_students(self, class_id: int) -> int:
+    def count_active_students(
+        self,
+        class_id: int,
+        exclude_student_id: int | None = None,
+    ) -> int:
         from sqlalchemy import or_
 
         stmt = select(func.count()).select_from(Student).where(
@@ -50,6 +54,8 @@ class ClassRepository(BaseRepository[Class]):
             Student.deleted_at.is_(None),
             Student.status == StudentStatus.ACTIVE.value,
         )
+        if exclude_student_id is not None:
+            stmt = stmt.where(Student.id != exclude_student_id)
         return self.session.scalar(stmt) or 0
 
     def get_active(self, class_id: int) -> Class | None:
@@ -57,3 +63,11 @@ class ClassRepository(BaseRepository[Class]):
         if entity and entity.deleted_at is None:
             return entity
         return None
+
+    def get_active_for_update(self, class_id: int) -> Class | None:
+        stmt = (
+            select(Class)
+            .where(Class.id == class_id, Class.deleted_at.is_(None))
+            .with_for_update()
+        )
+        return self.session.scalar(stmt)

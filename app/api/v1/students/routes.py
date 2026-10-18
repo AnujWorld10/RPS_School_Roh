@@ -39,13 +39,19 @@ def create_student(
 def list_students(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_permissions("students.read"))],
+    current_user: Annotated[User, Depends(require_permissions("students.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
     status: str | None = Query(default=None),
     current_class_id: int | None = Query(default=None),
     search: str | None = Query(default=None),
 ):
-    result = StudentService(db).list_students(params, status, current_class_id, search)
+    result = StudentService(db).list_students(
+        params,
+        current_user,
+        status,
+        current_class_id,
+        search,
+    )
     data = [StudentResponse.model_validate(item).model_dump() for item in result.items]
     return paginated_response(
         "Students fetched successfully",
@@ -62,9 +68,9 @@ def get_student(
     student_id: int,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_permissions("students.read"))],
+    current_user: Annotated[User, Depends(require_permissions("students.read"))],
 ):
-    student = StudentService(db).get_student(student_id)
+    student = StudentService(db).get_student_for_user(student_id, current_user)
     return success_response(
         "Student fetched successfully",
         StudentResponse.model_validate(student).model_dump(),

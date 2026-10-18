@@ -91,6 +91,28 @@ class Settings(BaseSettings):
             raise ValueError(
                 "INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD must be configured together"
             )
+        if self.app_env == "production":
+            if self.debug:
+                raise ValueError("DEBUG must be false in production")
+
+            secret = self.jwt_secret_key.lower()
+            placeholder_fragments = (
+                "change-me",
+                "example",
+                "placeholder",
+                "replace",
+                "your-secret",
+                "secret-key-here",
+                "development",
+                "test-secret",
+            )
+            if len(self.jwt_secret_key) < 32 or any(
+                fragment in secret for fragment in placeholder_fragments
+            ):
+                raise ValueError(
+                    "JWT_SECRET_KEY must be a unique random secret of at least 32 characters "
+                    "in production"
+                )
         return self
 
     @property

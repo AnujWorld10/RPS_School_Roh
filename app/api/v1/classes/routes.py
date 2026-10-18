@@ -3,10 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permissions, require_roles
+from app.api.deps import require_permissions
 from app.core.pagination import PaginationParams, pagination_params
 from app.core.responses import paginated_response, success_response
 from app.db.session import get_db
+from app.models.enums import ClassStatus
 from app.models.user import User
 from app.schemas.classes import ClassCreateRequest, ClassResponse, ClassUpdateRequest
 from app.services.classes import ClassService
@@ -36,7 +37,7 @@ def list_classes(
     _: Annotated[User, Depends(require_permissions("classes.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
     academic_year: str | None = Query(default=None),
-    status: str | None = Query(default=None),
+    status: Annotated[ClassStatus | None, Query()] = None,
 ):
     result = ClassService(db).list_classes(params, academic_year, status)
     data = [ClassResponse.model_validate(item).model_dump() for item in result.items]

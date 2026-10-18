@@ -262,13 +262,21 @@ JWT_SECRET_KEY=your-long-random-secret-key-here
 docker build -t school_api_image -f docker/Dockerfile .
 ```
 
-4. Run the container with the `.env` file:
+4. Run the migration as an explicit release step:
 
 ```powershell
-docker run --rm -p 8000:8000 --env-file .env school_api_image
+docker run --rm --env-file .env school_api_image alembic upgrade head
 ```
 
-5. Open the app:
+5. Start the API with a persistent uploads volume:
+
+```powershell
+docker volume create school_uploads
+docker run --rm -p 8000:8000 --env-file .env `
+  -v school_uploads:/app/uploads school_api_image
+```
+
+6. Open the app:
 
 ```text
 http://localhost:8000/health
@@ -278,35 +286,38 @@ http://localhost:8000/health
 
 Use this when both the API and MySQL run inside Docker.
 
-1. Start Docker Compose from the project root:
+1. Start MySQL from the project root:
 
 ```powershell
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml up -d db
 ```
 
-2. Confirm services:
+2. Apply migrations once, before starting or scaling API instances:
+
+```powershell
+docker compose -f docker/docker-compose.yml --profile release run --rm migrate
+```
+
+3. Start API instances:
+
+```powershell
+docker compose -f docker/docker-compose.yml up -d api
+```
+
+4. Check service state and inspect logs:
 
 ```powershell
 docker compose -f docker/docker-compose.yml ps
-```
-
-You should see:
-- `db` (MySQL)
-- `api` (FastAPI)
-
-3. Inspect logs:
-
-```powershell
 docker compose -f docker/docker-compose.yml logs -f api
 ```
 
-4. Open the health endpoint:
+5. Open the readiness endpoint:
 
 ```text
-http://localhost:8000/health
+http://localhost:8000/ready
 ```
 
-5. Connect to Docker MySQL from Windows if needed:
+6. Connect to Docker MySQL from Windows if needed:
 
 - Host: `127.0.0.1`
 - Port: `3307`
@@ -314,13 +325,13 @@ http://localhost:8000/health
 - Password: `mysql`
 - Database: `school_db`
 
-6. Stop services:
+7. Stop services:
 
 ```powershell
 docker compose -f docker/docker-compose.yml down
 ```
 
-7. Remove the MySQL volume for a fresh start:
+8. Remove the database and uploads volumes for a destructive fresh start:
 
 ```powershell
 docker compose -f docker/docker-compose.yml down -v
@@ -689,7 +700,9 @@ Base: `/api/v1` unless noted. **Auth:** None | Bearer | Permission code.
 
 | Method | URL | Auth | Purpose |
 |--------|-----|------|---------|
-| GET | `/health` | None | Health + DB connectivity |
+| GET | `/live` | None | Process liveness; does not require database |
+| GET | `/ready` | None | Readiness check with live database probe |
+| GET | `/health` | None | Backward-compatible readiness check |
 
 #### Public — Student
 
@@ -1030,7 +1043,8 @@ All errors are returned in the same envelope shape (see Section 7.1). For exampl
 | Retention | `LOG_RETENTION_DAYS` (startup cleanup + manual script `scripts/cleanup_logs.py`) |
 | Request ID | `RequestIDMiddleware` — header `X-Request-ID` |
 | Audit | `audit_logs` table via `AuditService` |
-| Health | `GET /health` — DB ping |
+| Liveness | `GET /live` — process responds; no database dependency |
+| Readiness | `GET /ready` and `GET /health` — execute database `SELECT 1`; HTTP 503 when unavailable |
 
 **Recommendations (production):** ship JSON logs to a centralized platform (ELK/OpenSearch, Loki, CloudWatch, Datadog), add error tracking (Sentry), and metrics/tracing (Prometheus + OpenTelemetry).
 
@@ -1122,7 +1136,12 @@ Custom types: `app/core/exceptions.py`
 
 Validation: `app/utils/file_storage.py` — extension and size checks.
 
+Compose mounts the named volume `school_uploads` at `/app/uploads`; replacing the API container
+preserves uploaded files. The destructive `docker compose down -v` command removes this volume.
+
 **Security:** Store outside web root in production; scan files; use S3 with pre-signed URLs for scale.
+Apply a reverse-proxy or WAF request-body limit slightly above the configured upload size to
+allow multipart overhead and reject oversized requests before parsing.
 
 ---
 
@@ -1184,15 +1203,22 @@ alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 14.2 Docker Compose
+### 14.2 Docker Compose and Release Migrations
 
 ```powershell
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml up -d db
+docker compose -f docker/docker-compose.yml --profile release run --rm migrate
+docker compose -f docker/docker-compose.yml up -d api
 ```
 
-This starts two containers:
+The API image starts Uvicorn directly and does not run Alembic on startup. Run the one-shot
+`migrate` service once as part of each release, after the database is healthy and before deploying
+or scaling API replicas. Do not launch migrations independently from API replicas.
+
+Compose provides these services:
 
 - `db` → Dockerized MySQL
+- `migrate` → one-shot Alembic task, enabled with the `release` profile
 - `api` → FastAPI application
 
 When using Compose:
@@ -1200,6 +1226,10 @@ When using Compose:
 - The API connects to MySQL at `mysql+pymysql://root:mysql@db:3306/school_db`
 - The host maps MySQL container port `3306` to host port `3307`
 - The API is available on host port `8000`
+- Compose builds the internal database URL from `MYSQL_ROOT_PASSWORD`; URL-encode reserved
+  characters in the password before using it in the URL.
+- The `school_uploads` named volume persists files mounted at `/app/uploads`
+- The API healthcheck uses `/ready` and remains unhealthy while the database is unavailable
 
 To watch the API logs:
 
@@ -1219,7 +1249,23 @@ To reset the Docker MySQL database data:
 docker compose -f docker/docker-compose.yml down -v
 ```
 
-### 14.3 Production (Recommended)
+The `down -v` command also deletes uploaded documents from `school_uploads`; use it only when
+deleting both database and file data is intentional.
+
+### 14.3 Health Probes and Public Endpoint Protection
+
+| Endpoint | Probe purpose | Database required | Failure behavior |
+|----------|---------------|-------------------|------------------|
+| `GET /live` | Process liveness | No | 200 while the API responds |
+| `GET /ready` | Readiness for traffic | Yes (`SELECT 1`) | 503 with standard error envelope |
+| `GET /health` | Backward-compatible readiness alias | Yes (`SELECT 1`) | 503 with standard error envelope |
+
+Rate-limit public inquiry/admission traffic at a shared ingress or WAF so the policy covers all
+API replicas. Apply per-client limits to public submission routes, set a request-body cap slightly
+above `MAX_UPLOAD_SIZE_MB` for multipart overhead, and trust forwarded client-IP headers only from
+known proxy or load-balancer addresses. Tune thresholds against expected production traffic.
+
+### 14.4 Production (Recommended)
 
 ```text
 Nginx (TLS) → Gunicorn (UvicornWorker) → FastAPI

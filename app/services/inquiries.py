@@ -5,6 +5,7 @@ Handles public submission, parent updates, staff review, and status history.
 """
 
 from fastapi import Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
@@ -33,7 +34,7 @@ from app.schemas.inquiries import (
     PublicInquiryUpdateRequest,
 )
 from app.services.audit import AuditService
-from app.utils.inquiry_ids import generate_inquiry_identifiers
+from app.utils.inquiry_ids import generate_inquiry_identifiers, inquiry_identity_key
 
 
 class InquiryService:
@@ -61,7 +62,12 @@ class InquiryService:
 
         Sets status to PENDING, generates inquiry_code, and writes initial history.
         """
-        # Check for duplicate inquiry before proceeding
+        duplicate_key = inquiry_identity_key(
+            payload.first_name,
+            payload.last_name,
+            payload.father_name,
+            payload.dob,
+        )
         existing_inquiry = self.repo.find_duplicate_inquiry(
             first_name=payload.first_name,
             last_name=payload.last_name,
@@ -78,44 +84,58 @@ class InquiryService:
             if not school_class or school_class.status != ClassStatus.ACTIVE.value:
                 raise NotFoundException("Admission target class not found in catalog")
 
-        with transaction(self.session):
-            inquiry_code, serial_number = generate_inquiry_identifiers(self.session)
-            inquiry = self.repo.create(
-                StudentInquiry(
-                    inquiry_code=inquiry_code,
-                    serial_number=serial_number,
-                    first_name=payload.first_name,
-                    middle_name=payload.middle_name,
-                    last_name=payload.last_name,
-                    gender=payload.gender.value,
-                    father_name=payload.father_name,
-                    date_of_birth=payload.dob,
-                    student_mobile=payload.student_mobile,
-                    parent_mobile=payload.parent_mobile,
-                    email=str(payload.email),
-                    address=payload.address,
-                    last_school=payload.last_school,
-                    current_class=payload.current_class,
-                    admission_for_class=payload.admission_for_class,
-                    last_school_percentage=payload.last_school_percentage,
-                    admission_for_class_id=payload.admission_for_class_id,
-                    status=InquiryStatus.PENDING.value,
+        try:
+            with transaction(self.session):
+                inquiry_code, serial_number = generate_inquiry_identifiers(self.session)
+                inquiry = self.repo.create(
+                    StudentInquiry(
+                        inquiry_code=inquiry_code,
+                        serial_number=serial_number,
+                        duplicate_key=duplicate_key,
+                        first_name=payload.first_name,
+                        middle_name=payload.middle_name,
+                        last_name=payload.last_name,
+                        gender=payload.gender.value,
+                        father_name=payload.father_name,
+                        date_of_birth=payload.dob,
+                        student_mobile=payload.student_mobile,
+                        parent_mobile=payload.parent_mobile,
+                        email=str(payload.email),
+                        address=payload.address,
+                        last_school=payload.last_school,
+                        current_class=payload.current_class,
+                        admission_for_class=payload.admission_for_class,
+                        last_school_percentage=payload.last_school_percentage,
+                        admission_for_class_id=payload.admission_for_class_id,
+                        status=InquiryStatus.PENDING.value,
+                    )
                 )
+                self._record_status(
+                    inquiry=inquiry,
+                    from_status=None,
+                    to_status=InquiryStatus.PENDING.value,
+                    change_reason="Inquiry submitted via public form",
+                )
+                self.audit.log(
+                    action="inquiry.create.public",
+                    entity_type="student_inquiry",
+                    entity_id=inquiry.id,
+                    new_values={"inquiry_code": inquiry.inquiry_code, "status": inquiry.status},
+                    request=request,
+                )
+                return inquiry
+        except IntegrityError as exc:
+            existing_inquiry = self.repo.find_duplicate_inquiry(
+                first_name=payload.first_name,
+                last_name=payload.last_name,
+                father_name=payload.father_name,
+                date_of_birth=payload.dob,
             )
-            self._record_status(
-                inquiry=inquiry,
-                from_status=None,
-                to_status=InquiryStatus.PENDING.value,
-                change_reason="Inquiry submitted via public form",
-            )
-            self.audit.log(
-                action="inquiry.create.public",
-                entity_type="student_inquiry",
-                entity_id=inquiry.id,
-                new_values={"inquiry_code": inquiry.inquiry_code, "status": inquiry.status},
-                request=request,
-            )
-            return inquiry
+            if existing_inquiry:
+                raise ConflictException(
+                    "Student inquiry already exists. Please contact school administration."
+                ) from exc
+            raise
 
     def get_public_status(
         self,
@@ -156,6 +176,12 @@ class InquiryService:
             )
 
         with transaction(self.session):
+            old_identity = (
+                inquiry.first_name,
+                inquiry.last_name,
+                inquiry.father_name,
+                inquiry.date_of_birth,
+            )
             for field, attr in (
                 ("first_name", "first_name"),
                 ("middle_name", "middle_name"),
@@ -174,6 +200,24 @@ class InquiryService:
                     setattr(inquiry, attr, value)
             if payload.gender is not None:
                 inquiry.gender = payload.gender.value
+            new_identity = (
+                inquiry.first_name,
+                inquiry.last_name,
+                inquiry.father_name,
+                inquiry.date_of_birth,
+            )
+            if new_identity != old_identity:
+                duplicate = self.repo.find_duplicate_inquiry(
+                    first_name=inquiry.first_name,
+                    last_name=inquiry.last_name,
+                    father_name=inquiry.father_name,
+                    date_of_birth=inquiry.date_of_birth,
+                )
+                if duplicate and duplicate.id != inquiry.id:
+                    raise ConflictException(
+                        "Student inquiry already exists. Please contact school administration."
+                    )
+                inquiry.duplicate_key = inquiry_identity_key(*new_identity)
             inquiry = self.repo.update(inquiry)
             self.audit.log(
                 action="inquiry.update.public",
@@ -246,9 +290,13 @@ class InquiryService:
         """
 
         def _apply() -> StudentInquiry:
-            inquiry = self.inquiries.get_by_id(inquiry_id)
+            inquiry = self.repo.get_by_id_for_update(inquiry_id)
             if not inquiry:
                 raise NotFoundException("Inquiry not found")
+            if new_status not in {status.value for status in InquiryStatus}:
+                raise BusinessRuleException(f"Unknown inquiry status: {new_status}")
+            if new_status == InquiryStatus.REJECTED.value and not rejection_reason:
+                raise BusinessRuleException("Rejection reason is required")
             if new_status == InquiryStatus.REJECTED.value:
                 if inquiry.status in INQUIRY_LOCKED_STATUSES:
                     raise BusinessRuleException("Inquiry is already in a terminal state")
@@ -261,9 +309,10 @@ class InquiryService:
             old_status = inquiry.status
             inquiry.status = new_status
             if new_status == InquiryStatus.REJECTED.value:
-                if not rejection_reason:
-                    raise BusinessRuleException("Rejection reason is required")
                 inquiry.rejection_reason = rejection_reason
+                inquiry.duplicate_key = None
+            elif new_status == InquiryStatus.INTERVIEW_FAIL.value:
+                inquiry.duplicate_key = None
             inquiry = self.repo.update(inquiry)
             self._record_status(
                 inquiry=inquiry,

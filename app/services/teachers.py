@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import BusinessRuleException, ConflictException, NotFoundException
 from app.core.pagination import PaginatedResult, PaginationParams
 from app.core.transactions import transaction
-from app.models.enums import PaymentStatus, TeacherStatus
+from app.models.enums import TeacherStatus
 from app.models.teacher import Teacher, TeacherAttendance, TeacherSalaryPayment
 from app.repositories.teachers import (
     TeacherAssignmentRepository,
@@ -88,13 +88,20 @@ class TeacherService:
         request: Request,
     ) -> Teacher:
         teacher = self.get_teacher(teacher_id)
-        if teacher.status == TeacherStatus.RESIGNED.value and payload.status != TeacherStatus.ACTIVE.value:
+        if (
+            teacher.status == TeacherStatus.RESIGNED.value
+            and payload.status != TeacherStatus.ACTIVE
+        ):
             raise BusinessRuleException("Cannot update resigned teacher without override")
         with transaction(self.session):
             for field in ("first_name", "last_name", "email", "phone", "status"):
                 value = getattr(payload, field)
                 if value is not None:
-                    setattr(teacher, field, str(value) if field == "email" else value)
+                    if field == "email":
+                        value = str(value)
+                    elif field == "status":
+                        value = value.value
+                    setattr(teacher, field, value)
             teacher = self.repo.update(teacher)
             self.audit.log(
                 action="teacher.update",
@@ -172,7 +179,7 @@ class TeacherService:
                 TeacherAttendance(
                     teacher_id=teacher_id,
                     attendance_date=payload.attendance_date,
-                    status=payload.status,
+                    status=payload.status.value,
                     remarks=payload.remarks,
                 )
             )
@@ -217,7 +224,7 @@ class TeacherService:
                     gross_amount=payload.gross_amount,
                     deduction_amount=payload.deduction_amount,
                     net_amount=payload.net_amount,
-                    status=payload.status or PaymentStatus.PAID.value,
+                    status=payload.status.value,
                     paid_at=payload.paid_at or datetime.now(UTC),
                 )
             )

@@ -10,7 +10,8 @@ Endpoints:
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Header, Request, status
-from pydantic import EmailStr
+from fastapi.exceptions import RequestValidationError
+from pydantic import EmailStr, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AuthenticationException
@@ -102,13 +103,13 @@ def update_student_inquiry(
 def submit_admission(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    inquiry_code: str = Form(...),
-    email: str = Form(...),
-    parent_mobile: str = Form(...),
-    class_id: int = Form(...),
-    academic_year: str = Form(...),
-    section: str | None = Form(default=None),
-    permanent_address: str | None = Form(default=None),
+    inquiry_code: Annotated[str, Form(min_length=5, max_length=20)],
+    email: Annotated[EmailStr, Form()],
+    parent_mobile: Annotated[str, Form(min_length=5, max_length=30)],
+    class_id: Annotated[int, Form(gt=0)],
+    academic_year: Annotated[str, Form(min_length=4, max_length=20)],
+    section: Annotated[str | None, Form(max_length=20)] = None,
+    permanent_address: Annotated[str | None, Form(max_length=2000)] = None,
 ):
     """
     Public admission form (FRD POST /student/admission).
@@ -117,18 +118,28 @@ def submit_admission(
     """
     inquiry = StudentInquiryRepository(db).verify_parent_credentials(
         inquiry_code.strip().upper(),
-        email,
-        parent_mobile,
+        str(email),
+        parent_mobile.strip(),
     )
     if not inquiry:
         raise AuthenticationException("Invalid inquiry credentials")
 
-    payload = InquiryAdmissionCreateRequest(
-        class_id=class_id,
-        section=section,
-        academic_year=academic_year,
-        permanent_address=permanent_address,
-    )
+    try:
+        payload = InquiryAdmissionCreateRequest(
+            class_id=class_id,
+            section=section,
+            academic_year=academic_year,
+            permanent_address=permanent_address,
+        )
+    except ValidationError as exc:
+        errors = [
+            {
+                **error,
+                "loc": ("body", *error.get("loc", ())),
+            }
+            for error in exc.errors()
+        ]
+        raise RequestValidationError(errors) from exc
     admission = InquiryAdmissionService(db).create_from_inquiry(
         inquiry.id, payload, actor_id=None, request=request
     )

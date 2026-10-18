@@ -4,7 +4,7 @@ Authenticated staff APIs for managing student admission inquiries.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permissions
@@ -70,7 +70,7 @@ def update_inquiry_admin(
     payload: AdminInquiryUpdateRequest,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_permissions("inquiries.update"))],
+    current_user: Annotated[User, Depends(require_permissions("inquiries.review"))],
 ):
     """Update staff-only fields (class mapping, internal notes)."""
     inquiry = InquiryService(db).update_inquiry_admin(
@@ -88,7 +88,7 @@ def start_inquiry_review(
     inquiry_id: int,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_permissions("inquiries.update"))],
+    current_user: Annotated[User, Depends(require_permissions("inquiries.review"))],
     body: InquiryReviewActionRequest | None = None,
 ):
     """Move inquiry from PENDING to UNDER_REVIEW."""

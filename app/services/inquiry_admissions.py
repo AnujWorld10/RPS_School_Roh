@@ -166,6 +166,8 @@ class InquiryAdmissionService:
         admission = self.get_admission(admission_id)
         if admission.status == AdmissionStatus.REJECTED.value:
             raise BusinessRuleException("Cannot upload documents for rejected admission")
+        if admission.student_id is not None:
+            raise BusinessRuleException("Cannot replace documents after enrollment")
 
         relative_path, original_name = save_upload_file(
             file,
@@ -173,11 +175,22 @@ class InquiryAdmissionService:
         )
 
         with transaction(self.session):
+            admission = self.repo.get_with_documents(admission_id, for_update=True)
+            if not admission:
+                raise NotFoundException("Admission not found")
+            if admission.status == AdmissionStatus.REJECTED.value:
+                raise BusinessRuleException("Cannot upload documents for rejected admission")
+            if admission.student_id is not None:
+                raise BusinessRuleException("Cannot replace documents after enrollment")
+
             existing = self.documents.get_by_admission_and_type(admission_id, document_type)
             if existing:
                 existing.file_name = original_name
                 existing.file_path = relative_path
+                existing.mime_type = file.content_type
                 existing.verification_status = DocumentVerificationStatus.PENDING.value
+                existing.verified_by = None
+                existing.verified_at = None
                 existing.rejection_reason = None
                 doc = self.documents.update(existing)
             else:
@@ -190,6 +203,24 @@ class InquiryAdmissionService:
                         mime_type=file.content_type,
                     )
                 )
+            if admission.status in (
+                AdmissionStatus.APPROVED.value,
+                AdmissionStatus.DOCUMENT_VERIFICATION.value,
+            ):
+                admission.status = AdmissionStatus.DOCUMENT_PENDING.value
+                admission.approved_by = None
+                admission.approved_at = None
+                self.repo.update(admission)
+                inquiry = self.inquiries.get_by_id_for_update(admission.inquiry_id)
+                if inquiry and inquiry.status == InquiryStatus.DOCUMENT_VERIFICATION.value:
+                    self.inquiry_service.transition_status(
+                        admission.inquiry_id,
+                        InquiryStatus.DOCUMENT_PENDING.value,
+                        None,
+                        request,
+                        change_reason="Admission document replaced; re-verification required",
+                        manage_transaction=False,
+                    )
             self.audit.log(
                 action="admission.document.upload",
                 entity_type="admission_document",
@@ -247,14 +278,16 @@ class InquiryAdmissionService:
         if all(d.verification_status == DocumentVerificationStatus.VERIFIED.value for d in docs):
             admission.status = AdmissionStatus.DOCUMENT_VERIFICATION.value
             self.repo.update(admission)
-            self.inquiry_service.transition_status(
-                admission.inquiry_id,
-                InquiryStatus.DOCUMENT_VERIFICATION.value,
-                actor_id,
-                request,
-                change_reason="All documents verified",
-                manage_transaction=False,
-            )
+            inquiry = self.inquiries.get_by_id_for_update(admission.inquiry_id)
+            if inquiry and inquiry.status != InquiryStatus.DOCUMENT_VERIFICATION.value:
+                self.inquiry_service.transition_status(
+                    admission.inquiry_id,
+                    InquiryStatus.DOCUMENT_VERIFICATION.value,
+                    actor_id,
+                    request,
+                    change_reason="All documents verified",
+                    manage_transaction=False,
+                )
 
     def submit_for_enrollment(
         self,
@@ -267,17 +300,22 @@ class InquiryAdmissionService:
 
         Inquiry must be in DOCUMENT_VERIFICATION.
         """
-        admission = self.get_admission(admission_id)
-        docs = self.documents.list_for_admission(admission_id)
-        uploaded = {d.document_type for d in docs}
-        if not REQUIRED_ADMISSION_DOCUMENTS.issubset(uploaded):
-            raise BusinessRuleException("All required documents must be uploaded")
-        if not all(
-            d.verification_status == DocumentVerificationStatus.VERIFIED.value for d in docs
-        ):
-            raise BusinessRuleException("All documents must be verified before approval")
-
         with transaction(self.session):
+            admission = self.repo.get_with_documents(admission_id, for_update=True)
+            if not admission:
+                raise NotFoundException("Admission not found")
+            if admission.student_id is not None:
+                raise BusinessRuleException("Student is already enrolled")
+            docs = admission.documents
+            uploaded = {document.document_type for document in docs}
+            if not REQUIRED_ADMISSION_DOCUMENTS.issubset(uploaded):
+                raise BusinessRuleException("All required documents must be uploaded")
+            if any(
+                document.verification_status != DocumentVerificationStatus.VERIFIED.value
+                for document in docs
+            ):
+                raise BusinessRuleException("All documents must be verified before approval")
+
             admission.status = AdmissionStatus.APPROVED.value
             admission.approved_by = actor_id
             admission.approved_at = datetime.now(UTC)

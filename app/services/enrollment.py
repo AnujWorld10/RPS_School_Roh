@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessRuleException, NotFoundException
 from app.core.transactions import transaction
-from app.models.enums import AdmissionStatus, ClassStatus, InquiryStatus, StudentStatus
+from app.models.enums import (
+    REQUIRED_ADMISSION_DOCUMENTS,
+    AdmissionStatus,
+    ClassStatus,
+    DocumentVerificationStatus,
+    InquiryStatus,
+    StudentStatus,
+)
 from app.models.student import Student
 from app.repositories.classes import ClassRepository
 from app.repositories.inquiry_admissions import InquiryAdmissionRepository
@@ -46,27 +53,36 @@ class EnrollmentService:
         Returns:
             EnrollmentResponse with student and roll details.
         """
-        admission = self.admissions.get_with_documents(admission_id)
-        if not admission:
-            raise NotFoundException("Admission not found")
-        if admission.status != AdmissionStatus.APPROVED.value:
-            raise BusinessRuleException("Admission must be approved before enrollment")
-        if admission.student_id:
-            raise BusinessRuleException("Student already enrolled for this admission")
-
-        inquiry = admission.inquiry
-        if not inquiry:
-            raise NotFoundException("Linked inquiry not found")
-
-        school_class = self.classes.get_active(admission.class_id)
-        if not school_class or school_class.status != ClassStatus.ACTIVE.value:
-            raise BusinessRuleException("Target class is not active")
-
-        enrolled = self.classes.count_active_students(admission.class_id)
-        if enrolled >= school_class.capacity:
-            raise BusinessRuleException("Class capacity exceeded")
-
         with transaction(self.session):
+            admission = self.admissions.get_with_documents(admission_id, for_update=True)
+            if not admission:
+                raise NotFoundException("Admission not found")
+            if admission.status != AdmissionStatus.APPROVED.value:
+                raise BusinessRuleException("Admission must be approved before enrollment")
+            if admission.student_id:
+                raise BusinessRuleException("Student already enrolled for this admission")
+
+            uploaded_types = {document.document_type for document in admission.documents}
+            if not REQUIRED_ADMISSION_DOCUMENTS.issubset(uploaded_types):
+                raise BusinessRuleException("All required documents must be uploaded")
+            if any(
+                document.verification_status != DocumentVerificationStatus.VERIFIED.value
+                for document in admission.documents
+            ):
+                raise BusinessRuleException("All admission documents must be verified")
+
+            inquiry = admission.inquiry
+            if not inquiry:
+                raise NotFoundException("Linked inquiry not found")
+
+            school_class = self.classes.get_active_for_update(admission.class_id)
+            if not school_class or school_class.status != ClassStatus.ACTIVE.value:
+                raise BusinessRuleException("Target class is not active")
+
+            enrolled = self.classes.count_active_students(admission.class_id)
+            if enrolled >= school_class.capacity:
+                raise BusinessRuleException("Class capacity exceeded")
+
             roll_number = allocate_roll_number(
                 self.session,
                 admission.class_id,
