@@ -36,8 +36,15 @@ def list_classes(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_permissions("classes.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
-    academic_year: str | None = Query(default=None),
-    status: Annotated[ClassStatus | None, Query()] = None,
+    academic_year: str | None = Query(
+        default=None,
+        description="Filter by academic year.",
+        examples=["2026-2027"],
+    ),
+    status: Annotated[
+        ClassStatus | None,
+        Query(description="Filter by class state: active or inactive."),
+    ] = None,
 ):
     result = ClassService(db).list_classes(params, academic_year, status)
     data = [ClassResponse.model_validate(item).model_dump() for item in result.items]

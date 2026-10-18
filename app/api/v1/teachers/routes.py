@@ -47,8 +47,14 @@ def list_teachers(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_permissions("teachers.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
-    status: Annotated[TeacherStatus | None, Query()] = None,
-    search: str | None = Query(default=None),
+    status: Annotated[
+        TeacherStatus | None,
+        Query(description="Filter by employment status: active, inactive, or resigned."),
+    ] = None,
+    search: str | None = Query(
+        default=None,
+        description="Search by teacher name or employee number.",
+    ),
 ):
     result = TeacherService(db).list_teachers(params, status, search)
     data = [TeacherResponse.model_validate(item).model_dump() for item in result.items]

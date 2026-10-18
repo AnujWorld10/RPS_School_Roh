@@ -48,8 +48,18 @@ def list_inquiry_admissions(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_permissions("admissions.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
-    status: str | None = Query(default=None),
-    academic_year: str | None = Query(default=None),
+    status: str | None = Query(
+        default=None,
+        description=(
+            "Filter by admission state: draft, submitted, document_pending, "
+            "document_verification, approved, or rejected."
+        ),
+    ),
+    academic_year: str | None = Query(
+        default=None,
+        description="Filter by academic year.",
+        examples=["2026-2027"],
+    ),
 ):
     result = InquiryAdmissionService(db).list_admissions(params, status, academic_year)
     data = [_admission_response(item) for item in result.items]
@@ -124,12 +134,21 @@ def upload_admission_document(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("admissions.update"))],
-    document_type: Annotated[str, Form()],
-    file: Annotated[UploadFile, File()],
+    document_type: Annotated[
+        str,
+        Form(
+            description=(
+                "Document category: progress_report, transfer_certificate, "
+                "migration_certificate, character_certificate, student_aadhar, or parent_aadhar."
+            )
+        ),
+    ],
+    file: Annotated[
+        UploadFile,
+        File(description="Document file to upload (PDF, JPG, JPEG, or PNG)."),
+    ],
 ):
-    doc = InquiryAdmissionService(db).upload_document(
-        admission_id, document_type, file, request
-    )
+    doc = InquiryAdmissionService(db).upload_document(admission_id, document_type, file, request)
     return success_response(
         "Document uploaded successfully",
         AdmissionDocumentResponse.model_validate(doc).model_dump(),
@@ -143,7 +162,10 @@ def verify_document(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("admissions.verify_documents"))],
-    verified: bool = Query(default=True),
+    verified: bool = Query(
+        default=True,
+        description="Set true to verify the document or false to reject it.",
+    ),
     body: DocumentVerifyRequest | None = None,
 ):
     doc = InquiryAdmissionService(db).verify_document(
@@ -232,8 +254,15 @@ def list_legacy_admissions(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_permissions("admissions.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
-    status: str | None = Query(default=None),
-    academic_year: str | None = Query(default=None),
+    status: str | None = Query(
+        default=None,
+        description="Filter by legacy admission state.",
+    ),
+    academic_year: str | None = Query(
+        default=None,
+        description="Filter by academic year.",
+        examples=["2026-2027"],
+    ),
 ):
     result = AdmissionService(db).list_admissions(params, status, academic_year)
     data = [AdmissionResponse.model_validate(item).model_dump() for item in result.items]

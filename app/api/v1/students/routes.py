@@ -41,9 +41,21 @@ def list_students(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("students.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
-    status: str | None = Query(default=None),
-    current_class_id: int | None = Query(default=None),
-    search: str | None = Query(default=None),
+    status: str | None = Query(
+        default=None,
+        description=(
+            "Filter by student status: prospective, active, inactive, graduated, or transferred."
+        ),
+    ),
+    current_class_id: int | None = Query(
+        default=None,
+        description="Filter by current class catalog ID.",
+        examples=[1],
+    ),
+    search: str | None = Query(
+        default=None,
+        description="Search by student name or admission number.",
+    ),
 ):
     result = StudentService(db).list_students(
         params,
