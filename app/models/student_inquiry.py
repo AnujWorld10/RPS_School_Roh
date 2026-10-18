@@ -47,6 +47,7 @@ class StudentInquiry(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("inquiry_code", name="uq_student_inquiry_code"),
         UniqueConstraint("serial_number", name="uq_student_inquiry_serial"),
+        Index("uq_student_inquiry_duplicate_key", "duplicate_key", unique=True),
         Index("ix_student_inquiry_status", "status"),
         Index("ix_student_inquiry_parent_mobile", "parent_mobile"),
         Index("ix_student_inquiry_email", "email"),
@@ -71,6 +72,11 @@ class StudentInquiry(Base, TimestampMixin):
         Integer,
         nullable=False,
         comment="Globally unique monotonic serial used to generate inquiry_code",
+    )
+    duplicate_key: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Normalized applicant identity key; null when reapplication is allowed",
     )
 
     # --- Student profile (from public form) ---

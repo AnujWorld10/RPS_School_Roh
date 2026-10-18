@@ -11,6 +11,7 @@ from app.core.pagination import PaginatedResult, PaginationParams
 from app.models.admission import InquiryAdmission
 from app.models.student_inquiry import InquiryStatusHistory, StudentInquiry
 from app.repositories.base import BaseRepository
+from app.utils.inquiry_ids import inquiry_identity_key
 
 
 class StudentInquiryRepository(BaseRepository[StudentInquiry]):
@@ -30,6 +31,14 @@ class StudentInquiryRepository(BaseRepository[StudentInquiry]):
                 selectinload(StudentInquiry.interviews),
                 selectinload(StudentInquiry.admission).selectinload(InquiryAdmission.documents),
             )
+        )
+        return self.session.scalar(stmt)
+
+    def get_by_id_for_update(self, inquiry_id: int) -> StudentInquiry | None:
+        stmt = (
+            select(StudentInquiry)
+            .where(StudentInquiry.id == inquiry_id)
+            .with_for_update()
         )
         return self.session.scalar(stmt)
 
@@ -89,7 +98,21 @@ class StudentInquiryRepository(BaseRepository[StudentInquiry]):
 
         Returns the existing inquiry if found, None otherwise.
         """
+        identity_key = inquiry_identity_key(
+            first_name,
+            last_name,
+            father_name,
+            date_of_birth,
+        )
         stmt = select(StudentInquiry).where(
+            StudentInquiry.duplicate_key == identity_key,
+            ~StudentInquiry.status.in_(["REJECTED", "INTERVIEW_FAIL"]),
+        )
+        inquiry = self.session.scalar(stmt)
+        if inquiry:
+            return inquiry
+
+        legacy_stmt = select(StudentInquiry).where(
             and_(
                 StudentInquiry.first_name.ilike(first_name.strip()),
                 StudentInquiry.last_name.ilike(last_name.strip()),
@@ -99,7 +122,7 @@ class StudentInquiryRepository(BaseRepository[StudentInquiry]):
                 ~StudentInquiry.status.in_(["REJECTED", "INTERVIEW_FAIL"]),
             )
         )
-        return self.session.scalar(stmt)
+        return self.session.scalar(legacy_stmt)
 
     def list_filtered(
         self,
@@ -109,7 +132,10 @@ class StudentInquiryRepository(BaseRepository[StudentInquiry]):
         search: str | None = None,
     ) -> PaginatedResult:
         """Paginated staff list with optional status, class, and search filters."""
-        stmt = select(StudentInquiry)
+        stmt = select(StudentInquiry).options(
+            selectinload(StudentInquiry.status_history),
+            selectinload(StudentInquiry.interviews),
+        )
         if status:
             stmt = stmt.where(StudentInquiry.status == status)
         if admission_for_class_id:

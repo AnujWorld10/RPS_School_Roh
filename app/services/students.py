@@ -8,6 +8,7 @@ from app.core.pagination import PaginatedResult, PaginationParams
 from app.core.transactions import transaction
 from app.models.enums import ClassStatus, StudentStatus
 from app.models.student import Student
+from app.models.user import User
 from app.repositories.classes import ClassRepository
 from app.repositories.students import StudentRepository
 from app.schemas.students import (
@@ -82,14 +83,29 @@ class StudentService:
     def list_students(
         self,
         params: PaginationParams,
+        current_user: User,
         status: str | None = None,
         current_class_id: int | None = None,
         search: str | None = None,
     ) -> PaginatedResult:
-        return self.repo.list_filtered(params, status, current_class_id, search)
+        return self.repo.list_filtered(
+            params,
+            status,
+            current_class_id,
+            search,
+            user=current_user,
+            role_codes={role.code for role in current_user.roles if role.is_active},
+        )
 
     def get_student(self, student_id: int) -> Student:
         student = self.repo.get_active(student_id)
+        if not student:
+            raise NotFoundException("Student not found")
+        return student
+
+    def get_student_for_user(self, student_id: int, current_user: User) -> Student:
+        role_codes = {role.code for role in current_user.roles if role.is_active}
+        student = self.repo.get_active_for_user(student_id, current_user, role_codes)
         if not student:
             raise NotFoundException("Student not found")
         return student
@@ -155,12 +171,31 @@ class StudentService:
         request: Request,
     ) -> Student:
         student = self.get_student(student_id)
-        school_class = self.classes.get_active(payload.class_id)
-        if not school_class or school_class.status != ClassStatus.ACTIVE.value:
-            raise NotFoundException("Class not found")
-        self._ensure_capacity(payload.class_id)
         with transaction(self.session):
+            school_class = self.classes.get_active_for_update(payload.class_id)
+            if not school_class or school_class.status != ClassStatus.ACTIVE.value:
+                raise NotFoundException("Class not found")
+            if school_class.academic_year != payload.academic_year:
+                raise BusinessRuleException(
+                    "Academic year must match the selected class",
+                )
+            if (
+                student.status == StudentStatus.ACTIVE.value
+                and (
+                    student.class_id != payload.class_id
+                    or student.academic_year != payload.academic_year
+                )
+            ):
+                enrolled = self.classes.count_active_students(
+                    payload.class_id,
+                    exclude_student_id=student.id,
+                )
+                if enrolled >= school_class.capacity:
+                    raise BusinessRuleException("Class capacity exceeded")
+
+            student.class_id = payload.class_id
             student.current_class_id = payload.class_id
+            student.academic_year = payload.academic_year
             if student.status == StudentStatus.PROSPECTIVE.value:
                 student.status = StudentStatus.ACTIVE.value
             student = self.repo.update(student)

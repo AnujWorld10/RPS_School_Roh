@@ -88,6 +88,8 @@ INQUIRY_ADMIN_TRANSITIONS: dict[str, set[str]] = {
         InquiryStatus.REJECTED.value,
     },
     InquiryStatus.INTERVIEW_SCHEDULED.value: {
+        InquiryStatus.INTERVIEW_PASS.value,
+        InquiryStatus.INTERVIEW_FAIL.value,
         InquiryStatus.REJECTED.value,
     },
     InquiryStatus.INTERVIEW_PASS.value: {
@@ -99,6 +101,7 @@ INQUIRY_ADMIN_TRANSITIONS: dict[str, set[str]] = {
         InquiryStatus.REJECTED.value,
     },
     InquiryStatus.DOCUMENT_VERIFICATION.value: {
+        InquiryStatus.DOCUMENT_PENDING.value,
         InquiryStatus.ADMISSION_SUCCESS.value,
         InquiryStatus.REJECTED.value,
     },

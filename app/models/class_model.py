@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import BIGINT_PK, Base, SoftDeleteMixin, TimestampMixin
@@ -9,6 +9,10 @@ class Class(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "classes"
     __table_args__ = (
         UniqueConstraint("name", "section", "academic_year", name="uq_class_name_section_year"),
+        CheckConstraint(
+            "status IN ('active', 'inactive')",
+            name="ck_classes_class_status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)

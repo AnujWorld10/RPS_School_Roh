@@ -1,7 +1,7 @@
 from datetime import date
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
 
 from app.models.enums import InquiryStatus
 from app.models.student_inquiry import StudentInquiry
@@ -21,6 +21,10 @@ def create_sample_inquiry(repo_session):
         gender="male",
         parent_mobile="03001234567",
         email="parent@test.local",
+        address="1 Test Road",
+        last_school="Test School",
+        current_class="Grade 4",
+        admission_for_class="Grade 5",
         status=InquiryStatus.PENDING.value,
     )
     from app.repositories.inquiries import StudentInquiryRepository
@@ -35,8 +39,16 @@ def test_valid_transition_pending_to_under_review(db_session):
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
     request_mock = MagicMock()
+    request_mock.state.request_id = "inquiry-service-test"
+    request_mock.client = None
+    request_mock.headers = {}
 
-    updated = service.transition_status(inquiry.id, InquiryStatus.UNDER_REVIEW.value, actor_id=1, request=request_mock)
+    updated = service.transition_status(
+        inquiry.id,
+        InquiryStatus.UNDER_REVIEW.value,
+        actor_id=1,
+        request=request_mock,
+    )
     assert updated.status == InquiryStatus.UNDER_REVIEW.value
 
 
@@ -47,8 +59,17 @@ def test_invalid_transition_raises_business_rule(db_session):
 
     # PENDING -> PROCESSING is not allowed directly
     with pytest.raises(Exception) as exc:
-        service.transition_status(inquiry.id, InquiryStatus.PROCESSING.value, actor_id=1, request=request_mock)
-    assert "Cannot transition" in str(exc.value) or "Cannot transition" in getattr(exc.value, 'message', '')
+        service.transition_status(
+            inquiry.id,
+            InquiryStatus.PROCESSING.value,
+            actor_id=1,
+            request=request_mock,
+        )
+    assert "Cannot transition" in str(exc.value) or "Cannot transition" in getattr(
+        exc.value,
+        "message",
+        "",
+    )
 
 
 def test_reject_requires_reason(db_session):
@@ -57,7 +78,12 @@ def test_reject_requires_reason(db_session):
     request_mock = MagicMock()
 
     with pytest.raises(Exception) as exc:
-        service.transition_status(inquiry.id, InquiryStatus.REJECTED.value, actor_id=1, request=request_mock)
+        service.transition_status(
+            inquiry.id,
+            InquiryStatus.REJECTED.value,
+            actor_id=1,
+            request=request_mock,
+        )
     assert "Rejection reason is required" in str(exc.value)
 
 

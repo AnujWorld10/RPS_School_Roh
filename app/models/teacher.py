@@ -1,7 +1,16 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import BIGINT_PK, Base, TimestampMixin
@@ -10,6 +19,12 @@ from app.models.enums import PaymentStatus, SalaryStatus, TeacherStatus
 
 class Teacher(Base, TimestampMixin):
     __tablename__ = "teachers"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'inactive', 'resigned')",
+            name="ck_teachers_teacher_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     user_id: Mapped[int | None] = mapped_column(
@@ -22,8 +37,8 @@ class Teacher(Base, TimestampMixin):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    phone: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
-    joining_date: Mapped[date] = mapped_column(Date, nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(30), unique=True, nullable=True)
+    joining_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(
         String(50),
         default=TeacherStatus.ACTIVE.value,
@@ -56,6 +71,10 @@ class TeacherAttendance(Base):
     __tablename__ = "teacher_attendance"
     __table_args__ = (
         UniqueConstraint("teacher_id", "attendance_date", name="uq_teacher_attendance_date"),
+        CheckConstraint(
+            "status IN ('present', 'absent', 'leave', 'half_day')",
+            name="ck_teacher_attendance_attendance_status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
@@ -74,6 +93,15 @@ class TeacherAttendance(Base):
 
 class TeacherSalary(Base):
     __tablename__ = "teacher_salary"
+    __table_args__ = (
+        CheckConstraint("base_salary >= 0", name="ck_teacher_salary_base_nonnegative"),
+        CheckConstraint("allowance >= 0", name="ck_teacher_salary_allowance_nonnegative"),
+        CheckConstraint("deduction >= 0", name="ck_teacher_salary_deduction_nonnegative"),
+        CheckConstraint(
+            "status IN ('active', 'inactive')",
+            name="ck_teacher_salary_salary_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     teacher_id: Mapped[int] = mapped_column(
@@ -100,6 +128,19 @@ class TeacherSalaryPayment(Base):
     __tablename__ = "teacher_salary_payments"
     __table_args__ = (
         UniqueConstraint("teacher_id", "payment_month", name="uq_teacher_payment_month"),
+        CheckConstraint("gross_amount >= 0", name="ck_teacher_payment_gross_nonnegative"),
+        CheckConstraint(
+            "deduction_amount >= 0 AND deduction_amount <= gross_amount",
+            name="ck_teacher_payment_deduction_range",
+        ),
+        CheckConstraint(
+            "net_amount >= 0 AND net_amount = gross_amount - deduction_amount",
+            name="ck_teacher_payment_net_calculation",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'paid', 'failed')",
+            name="ck_teacher_payment_payment_status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)

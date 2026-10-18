@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.exceptions import (
     AuthenticationException,
+    AuthorizationException,
     ConflictException,
-    NotFoundException,
     TokenInvalidException,
     ValidationException,
 )
@@ -32,6 +32,17 @@ from app.schemas.auth import (
 )
 from app.services.audit import AuditService
 
+ROLE_AUTHORITY = {
+    "STUDENT": 10,
+    "PARENT": 10,
+    "TEACHER": 20,
+    "ACCOUNTANT": 30,
+    "ADMISSION_OFFICER": 40,
+    "PRINCIPAL": 50,
+    "ADMIN": 80,
+    "SUPER_ADMIN": 100,
+}
+
 
 def _collect_roles_and_permissions(user: User) -> tuple[list[str], list[str]]:
     active_roles = [role for role in user.roles if role.is_active]
@@ -54,6 +65,10 @@ class AuthService:
 
     def register(self, payload: UserRegisterRequest, actor_id: int, request: Request) -> User:
         validate_password_strength(payload.password)
+        actor = self.users.get_with_roles(actor_id)
+        if not actor:
+            raise AuthorizationException()
+
         if self.users.email_exists(payload.email):
             raise ConflictException("Email already exists", field="email")
         if payload.phone and self.users.phone_exists(payload.phone):
@@ -62,6 +77,22 @@ class AuthService:
         roles = self.roles.get_by_codes(payload.role_codes)
         if len(roles) != len(set(payload.role_codes)):
             raise ValidationException("One or more role codes are invalid", field="role_codes")
+
+        actor_role_codes, _ = _collect_roles_and_permissions(actor)
+        if "SUPER_ADMIN" not in actor_role_codes:
+            actor_authority = max(
+                (ROLE_AUTHORITY.get(code, 100) for code in actor_role_codes),
+                default=0,
+            )
+            unauthorized_roles = [
+                role.code
+                for role in roles
+                if ROLE_AUTHORITY.get(role.code, 100) >= actor_authority
+            ]
+            if unauthorized_roles:
+                raise AuthorizationException(
+                    "You cannot assign a role with authority equal to or greater than your own"
+                )
 
         with transaction(self.session):
             user = self.users.create(
@@ -146,8 +177,9 @@ class AuthService:
 
     def logout(self, refresh_token: str, user_id: int, request: Request) -> None:
         stored = self.tokens.get_by_hash(hash_token(refresh_token))
-        if not stored:
-            raise NotFoundException("Refresh token was not found")
+        if not stored or stored.user_id != user_id or stored.revoked_at is not None:
+            raise TokenInvalidException("Refresh token is invalid or revoked")
+
         with transaction(self.session):
             stored.revoked_at = datetime.now(UTC)
             self.tokens.update(stored)

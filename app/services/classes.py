@@ -78,6 +78,7 @@ class ClassService:
         old_values = {
             "name": school_class.name,
             "section": school_class.section,
+            "academic_year": school_class.academic_year,
             "capacity": school_class.capacity,
             "status": school_class.status,
         }
@@ -86,12 +87,22 @@ class ClassService:
             if payload.capacity < enrolled:
                 raise BusinessRuleException("Capacity is below current student count")
 
-        if payload.name and payload.academic_year:
-            year = payload.academic_year or school_class.academic_year
+        new_name = payload.name if payload.name is not None else school_class.name
+        new_section = payload.section if payload.section is not None else school_class.section
+        new_academic_year = (
+            payload.academic_year
+            if payload.academic_year is not None
+            else school_class.academic_year
+        )
+        if (
+            payload.name is not None
+            or payload.section is not None
+            or payload.academic_year is not None
+        ):
             if self.repo.exists_duplicate(
-                payload.name,
-                payload.section if payload.section is not None else school_class.section,
-                year,
+                new_name,
+                new_section,
+                new_academic_year,
                 exclude_id=class_id,
             ):
                 raise ConflictException(
@@ -103,10 +114,12 @@ class ClassService:
                 school_class.name = payload.name
             if payload.section is not None:
                 school_class.section = payload.section
+            if payload.academic_year is not None:
+                school_class.academic_year = payload.academic_year
             if payload.capacity is not None:
                 school_class.capacity = payload.capacity
             if payload.status is not None:
-                school_class.status = payload.status
+                school_class.status = payload.status.value
             school_class = self.repo.update(school_class)
             self.audit.log(
                 action="class.update",
@@ -117,6 +130,7 @@ class ClassService:
                 new_values={
                     "name": school_class.name,
                     "section": school_class.section,
+                    "academic_year": school_class.academic_year,
                     "capacity": school_class.capacity,
                     "status": school_class.status,
                 },

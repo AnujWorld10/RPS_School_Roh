@@ -1,8 +1,14 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
+from app.models.enums import (
+    AttendanceStatus,
+    PaymentStatus,
+    SalaryStatus,
+    TeacherStatus,
+)
 from app.schemas.common import ORMModel
 
 
@@ -28,7 +34,7 @@ class TeacherUpdateRequest(BaseModel):
     last_name: str | None = None
     email: EmailStr | None = None
     phone: str | None = None
-    status: str | None = None
+    status: TeacherStatus | None = None
 
 
 class SubjectAssignRequest(BaseModel):
@@ -41,17 +47,32 @@ class ClassAssignRequest(BaseModel):
 
 class AttendanceCreateRequest(BaseModel):
     attendance_date: date
-    status: str
+    status: AttendanceStatus
     remarks: str | None = None
 
 
 class SalaryPaymentCreateRequest(BaseModel):
     payment_month: str = Field(..., pattern=r"^\d{4}-\d{2}$")
-    gross_amount: Decimal = Field(..., ge=0)
-    deduction_amount: Decimal = Field(default=Decimal("0"), ge=0)
-    net_amount: Decimal = Field(..., ge=0)
-    status: str = "paid"
+    gross_amount: Decimal = Field(..., ge=0, max_digits=12, decimal_places=2)
+    deduction_amount: Decimal = Field(
+        default=Decimal("0"),
+        ge=0,
+        max_digits=12,
+        decimal_places=2,
+    )
+    net_amount: Decimal = Field(..., ge=0, max_digits=12, decimal_places=2)
+    status: PaymentStatus = PaymentStatus.PAID
     paid_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_net_amount(self) -> "SalaryPaymentCreateRequest":
+        if self.net_amount != self.gross_amount - self.deduction_amount:
+            raise ValueError(
+                "net_amount must equal gross_amount minus deduction_amount"
+            )
+        if self.deduction_amount > self.gross_amount:
+            raise ValueError("deduction_amount cannot exceed gross_amount")
+        return self
 
 
 class TeacherResponse(ORMModel):
@@ -60,16 +81,16 @@ class TeacherResponse(ORMModel):
     first_name: str
     last_name: str
     email: str
-    phone: str
-    joining_date: date
-    status: str
+    phone: str | None
+    joining_date: date | None
+    status: TeacherStatus
 
 
 class AttendanceResponse(ORMModel):
     id: int
     teacher_id: int
     attendance_date: date
-    status: str
+    status: AttendanceStatus
     remarks: str | None
 
 
@@ -80,7 +101,7 @@ class SalaryResponse(ORMModel):
     allowance: Decimal
     deduction: Decimal
     effective_from: date
-    status: str
+    status: SalaryStatus
 
 
 class SalaryPaymentResponse(ORMModel):
@@ -91,10 +112,10 @@ class SalaryPaymentResponse(ORMModel):
     gross_amount: Decimal
     deduction_amount: Decimal
     net_amount: Decimal
-    status: str
+    status: PaymentStatus
     paid_at: datetime | None
 
 
 class TeacherFilterParams(BaseModel):
-    status: str | None = None
+    status: TeacherStatus | None = None
     search: str | None = None

@@ -7,6 +7,7 @@ from app.api.deps import require_permissions
 from app.core.pagination import PaginationParams, pagination_params
 from app.core.responses import paginated_response, success_response
 from app.db.session import get_db
+from app.models.enums import TeacherStatus
 from app.models.user import User
 from app.schemas.teachers import (
     AttendanceCreateRequest,
@@ -46,7 +47,7 @@ def list_teachers(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_permissions("teachers.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
-    status: str | None = Query(default=None),
+    status: Annotated[TeacherStatus | None, Query()] = None,
     search: str | None = Query(default=None),
 ):
     result = TeacherService(db).list_teachers(params, status, search)
