@@ -29,14 +29,26 @@ def list_inquiries(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_permissions("inquiries.read"))],
     params: Annotated[PaginationParams, Depends(pagination_params)],
-    status: str | None = Query(default=None, description="Filter by InquiryStatus value"),
-    admission_for_class_id: int | None = Query(default=None),
-    search: str | None = Query(default=None),
+    status: str | None = Query(
+        default=None,
+        description=(
+            "Filter by status: PENDING, UNDER_REVIEW, PROCESSING, INTERVIEW_SCHEDULED, "
+            "INTERVIEW_PASS, INTERVIEW_FAIL, DOCUMENT_PENDING, DOCUMENT_VERIFICATION, "
+            "ADMISSION_SUCCESS, or REJECTED."
+        ),
+    ),
+    admission_for_class_id: int | None = Query(
+        default=None,
+        description="Filter by requested catalog class ID.",
+        examples=[1],
+    ),
+    search: str | None = Query(
+        default=None,
+        description="Search by student name, inquiry code, email, or mobile.",
+    ),
 ):
     """Paginated list of all student inquiries for staff review."""
-    result = InquiryService(db).list_inquiries(
-        params, status, admission_for_class_id, search
-    )
+    result = InquiryService(db).list_inquiries(params, status, admission_for_class_id, search)
     data = [to_staff_inquiry_response(item) for item in result.items]
     return paginated_response(
         "Inquiries fetched successfully",
@@ -73,9 +85,7 @@ def update_inquiry_admin(
     current_user: Annotated[User, Depends(require_permissions("inquiries.review"))],
 ):
     """Update staff-only fields (class mapping, internal notes)."""
-    inquiry = InquiryService(db).update_inquiry_admin(
-        inquiry_id, payload, current_user.id, request
-    )
+    inquiry = InquiryService(db).update_inquiry_admin(inquiry_id, payload, current_user.id, request)
     return success_response(
         "Inquiry updated successfully",
         to_staff_inquiry_response(inquiry),

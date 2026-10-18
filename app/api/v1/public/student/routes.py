@@ -9,7 +9,7 @@ Endpoints:
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Header, Request, status
+from fastapi import APIRouter, Depends, Form, Header, Path, Request, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import EmailStr, ValidationError
 from sqlalchemy.orm import Session
@@ -57,11 +57,29 @@ def submit_student_inquiry(
     description="Requires the parent email and mobile number submitted with the inquiry.",
 )
 def get_inquiry_status(
-    inquiry_code: str,
+    inquiry_code: Annotated[
+        str,
+        Path(
+            description="Inquiry tracking code returned when the inquiry was submitted.",
+            examples=["INQ202600007"],
+        ),
+    ],
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    email: Annotated[EmailStr, Header(alias="X-Parent-Email")],
-    parent_mobile: Annotated[str, Header(alias="X-Parent-Mobile")],
+    email: Annotated[
+        EmailStr,
+        Header(
+            alias="X-Parent-Email",
+            description="Email address supplied with the original inquiry.",
+        ),
+    ],
+    parent_mobile: Annotated[
+        str,
+        Header(
+            alias="X-Parent-Mobile",
+            description="Parent/guardian mobile number supplied with the original inquiry.",
+        ),
+    ],
 ):
     """Return current status, rejection reason, and status timeline."""
     inquiry = InquiryService(db).get_public_status(
@@ -103,13 +121,48 @@ def update_student_inquiry(
 def submit_admission(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
-    inquiry_code: Annotated[str, Form(min_length=5, max_length=20)],
-    email: Annotated[EmailStr, Form()],
-    parent_mobile: Annotated[str, Form(min_length=5, max_length=30)],
-    class_id: Annotated[int, Form(gt=0)],
-    academic_year: Annotated[str, Form(min_length=4, max_length=20)],
-    section: Annotated[str | None, Form(max_length=20)] = None,
-    permanent_address: Annotated[str | None, Form(max_length=2000)] = None,
+    inquiry_code: Annotated[
+        str,
+        Form(
+            min_length=5,
+            max_length=20,
+            description="Inquiry tracking code returned when the inquiry was submitted.",
+            examples=["INQ202600007"],
+        ),
+    ],
+    email: Annotated[
+        EmailStr,
+        Form(description="Email address supplied with the original inquiry."),
+    ],
+    parent_mobile: Annotated[
+        str,
+        Form(
+            min_length=5,
+            max_length=30,
+            description="Parent/guardian mobile number supplied with the original inquiry.",
+        ),
+    ],
+    class_id: Annotated[
+        int,
+        Form(gt=0, description="Catalog ID of the class requested for admission.", examples=[1]),
+    ],
+    academic_year: Annotated[
+        str,
+        Form(
+            min_length=4,
+            max_length=20,
+            description="Academic year for admission.",
+            examples=["2026-2027"],
+        ),
+    ],
+    section: Annotated[
+        str | None,
+        Form(max_length=20, description="Optional section within the selected class."),
+    ] = None,
+    permanent_address: Annotated[
+        str | None,
+        Form(max_length=2000, description="Optional permanent residential address."),
+    ] = None,
 ):
     """
     Public admission form (FRD POST /student/admission).
