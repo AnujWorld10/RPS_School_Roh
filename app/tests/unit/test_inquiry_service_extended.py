@@ -1,11 +1,12 @@
 """Unit tests for service layer: audit logging, state transitions, error handling."""
 
 from datetime import date
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from app.core.exceptions import (
+    AuthenticationException,
     BusinessRuleException,
     NotFoundException,
 )
@@ -28,7 +29,11 @@ def create_sample_inquiry(repo_session):
         date_of_birth=date(2016, 1, 1),
         gender="male",
         parent_mobile="03001234567",
-        email="parent@test.local",
+        email="parent@example.com",
+        address="123 Test Street",
+        last_school="Test School",
+        current_class="Class 5",
+        admission_for_class="Class 6",
         status=InquiryStatus.PENDING.value,
     )
     repo = StudentInquiryRepository(repo_session)
@@ -40,7 +45,7 @@ def create_sample_inquiry(repo_session):
 def test_inquiry_status_history_recorded_on_creation(db_session):
     """Test that status history is recorded when inquiry is created."""
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     from app.models.enums import Gender
     from app.schemas.inquiries import PublicInquiryCreateRequest
@@ -54,7 +59,7 @@ def test_inquiry_status_history_recorded_on_creation(db_session):
         dob=date(2016, 1, 1),
         student_mobile="03001234567",
         parent_mobile="03009876543",
-        email="history@test.local",
+        email="history@example.com",
         address="123 St",
         last_school="School",
         current_class="Class 5",
@@ -66,7 +71,7 @@ def test_inquiry_status_history_recorded_on_creation(db_session):
     inquiry = service.create_public_inquiry(payload, request_mock)
 
     # Verify status history was recorded
-    history = service.history.get_by_inquiry_id(inquiry.id)
+    history = inquiry.status_history
     assert len(history) >= 1
     assert history[0].to_status == InquiryStatus.PENDING.value
 
@@ -75,15 +80,15 @@ def test_get_public_status_with_invalid_code_raises_not_found(db_session):
     """Test that get_public_status raises NotFoundException for invalid code."""
     service = InquiryService(db_session)
 
-    with pytest.raises(NotFoundException):
-        service.get_public_status("INVALID_CODE")
+    with pytest.raises(AuthenticationException):
+        service.get_public_status("INVALID_CODE", "nobody@example.com", "03001234567")
 
 
 def test_update_public_inquiry_with_no_changes_succeeds(db_session):
     """Test updating inquiry with no field changes succeeds."""
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     from app.schemas.inquiries import PublicInquiryUpdateRequest
 
@@ -104,7 +109,7 @@ def test_update_inquiry_admin_with_internal_notes(db_session):
     """Test admin update of inquiry with internal notes."""
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     from app.schemas.inquiries import AdminInquiryUpdateRequest
 
@@ -121,7 +126,7 @@ def test_start_review_transition_succeeds(db_session):
     """Test start_review transitions PENDING → UNDER_REVIEW."""
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     updated = service.start_review(
         inquiry.id,
@@ -137,7 +142,7 @@ def test_mark_processing_transition_succeeds(db_session):
     inquiry = create_sample_inquiry(db_session)
     # First transition to UNDER_REVIEW
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     updated = service.start_review(inquiry.id, actor_id=1, request=request_mock, notes=None)
     assert updated.status == InquiryStatus.UNDER_REVIEW.value
@@ -156,7 +161,7 @@ def test_reject_inquiry_from_pending_succeeds(db_session):
     """Test rejecting inquiry from PENDING status."""
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     updated = service.reject_inquiry(inquiry.id, "Not eligible", actor_id=1, request=request_mock)
     assert updated.status == InquiryStatus.REJECTED.value
@@ -167,7 +172,7 @@ def test_reject_inquiry_with_empty_reason_fails(db_session):
     """Test rejecting inquiry with empty reason raises error."""
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     with pytest.raises(BusinessRuleException):
         service.reject_inquiry(inquiry.id, "", actor_id=1, request=request_mock)
@@ -176,7 +181,7 @@ def test_reject_inquiry_with_empty_reason_fails(db_session):
 def test_audit_log_called_on_inquiry_create(db_session):
     """Test that audit log is created when inquiry is created."""
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     from app.models.enums import Gender
     from app.schemas.inquiries import PublicInquiryCreateRequest
@@ -190,7 +195,7 @@ def test_audit_log_called_on_inquiry_create(db_session):
         dob=date(2016, 6, 15),
         student_mobile="03001234567",
         parent_mobile="03009876543",
-        email="audit@test.local",
+        email="audit@example.com",
         address="123 St",
         last_school="School",
         current_class="Class 5",
@@ -213,7 +218,7 @@ def test_audit_log_called_on_status_transition(db_session):
     """Test that audit log is created on status transition."""
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     # Mock audit service
     with patch.object(service.audit, "log") as mock_log:
@@ -237,6 +242,10 @@ def test_list_inquiries_with_pagination(db_session):
             gender="male",
             parent_mobile=f"0300123456{i}",
             email=f"test{i}@test.local",
+            address="123 Test Street",
+            last_school="Test School",
+            current_class="Class 5",
+            admission_for_class="Class 6",
             status=InquiryStatus.PENDING.value,
         )
         repo = StudentInquiryRepository(db_session)
@@ -267,6 +276,10 @@ def test_list_inquiries_filter_by_status(db_session):
         gender="male",
         parent_mobile="03001234567",
         email="test1@test.local",
+        address="123 Test Street",
+        last_school="Test School",
+        current_class="Class 5",
+        admission_for_class="Class 6",
         status=InquiryStatus.PENDING.value,
     )
     repo = StudentInquiryRepository(db_session)
@@ -283,6 +296,10 @@ def test_list_inquiries_filter_by_status(db_session):
         gender="female",
         parent_mobile="03009876543",
         email="test2@test.local",
+        address="456 Test Avenue",
+        last_school="Test School",
+        current_class="Class 5",
+        admission_for_class="Class 6",
         status=InquiryStatus.UNDER_REVIEW.value,
     )
     repo.create(inquiry2)
@@ -310,7 +327,7 @@ def test_transition_status_without_transaction_management(db_session):
     """Test transition_status can be called with manage_transaction=False."""
     inquiry = create_sample_inquiry(db_session)
     service = InquiryService(db_session)
-    request_mock = MagicMock()
+    request_mock = None
 
     # Call with manage_transaction=False
     updated = service.transition_status(

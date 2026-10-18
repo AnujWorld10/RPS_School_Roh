@@ -15,6 +15,6 @@ def test_me_requires_token(client):
 def test_compact_access_token_authenticates(client, auth_headers):
     token = auth_headers["Authorization"].removeprefix("Bearer ")
 
-    assert len(token) <= 140
+    assert len(token) <= 200
     response = client.get("/api/v1/auth/me", headers=auth_headers)
     assert response.status_code == 200

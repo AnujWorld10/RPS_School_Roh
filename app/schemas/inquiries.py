@@ -53,6 +53,13 @@ class PublicInquiryCreateRequest(BaseModel):
             return value.strip()
         return value
 
+    @field_validator("dob")
+    @classmethod
+    def dob_must_not_be_in_future(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Date of birth cannot be in the future")
+        return value
+
 
 class PublicInquiryUpdateRequest(BaseModel):
     """

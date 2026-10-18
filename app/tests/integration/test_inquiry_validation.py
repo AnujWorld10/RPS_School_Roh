@@ -1,12 +1,13 @@
 """Integration tests for inquiry validation, error handling, and edge cases."""
 
 from datetime import datetime, timedelta
+from time import time_ns
 
 
 def get_unique_validation_payload(suffix=""):
     """Generate unique payload for validation tests."""
     if not suffix:
-        suffix = datetime.now().strftime("%s%f")[5:12]
+        suffix = f"{time_ns() % 10_000_000:07d}"
     return {
         "first_name": "Test",
         "last_name": f"Student{suffix}",
@@ -185,13 +186,13 @@ def test_inquiry_code_is_unique(client):
     """POST /public/student/inquiry returns unique inquiry codes."""
     payload1 = {
         "first_name": "Unique1",
-        "last_name": f"Student{datetime.now().strftime('%s%f')[5:12]}",
+        "last_name": f"Student{time_ns() % 10_000_000:07d}",
         "gender": "male",
         "father_name": "Parent1",
         "dob": "2015-01-01",
         "student_mobile": "+919876543210",
         "parent_mobile": "+919123456789",
-        "email": f"unique1-{datetime.now().strftime('%s%f')[5:12]}@example.com",
+        "email": f"unique1-{time_ns() % 10_000_000:07d}@example.com",
         "address": "123 St",
         "last_school": "School",
         "current_class": "Grade 5",
@@ -199,13 +200,13 @@ def test_inquiry_code_is_unique(client):
     }
     payload2 = {
         "first_name": "Unique2",
-        "last_name": f"Student{datetime.now().strftime('%s%f')[5:12]}",
+        "last_name": f"Student{time_ns() % 10_000_000:07d}",
         "gender": "female",
         "father_name": "Parent2",
         "dob": "2015-02-01",
         "student_mobile": "+919876543211",
         "parent_mobile": "+919123456788",
-        "email": f"unique2-{datetime.now().strftime('%s%f')[5:12]}@example.com",
+        "email": f"unique2-{time_ns() % 10_000_000:07d}@example.com",
         "address": "456 Ave",
         "last_school": "School",
         "current_class": "Grade 5",
@@ -220,14 +221,20 @@ def test_inquiry_code_is_unique(client):
 
 def test_status_check_with_invalid_inquiry_code_returns_404(client):
     """GET /public/student/inquiry/status/{code} with invalid code returns 404."""
-    response = client.get("/api/v1/public/student/inquiry/status/INVALID")
-    assert response.status_code == 404
+    response = client.get(
+        "/api/v1/public/student/inquiry/status/INVALID",
+        headers={
+            "X-Parent-Email": "nobody@example.com",
+            "X-Parent-Mobile": "+910000000000",
+        },
+    )
+    assert response.status_code == 401
 
 
 def test_status_check_inquiry_code_is_case_insensitive(client):
     """GET /public/student/inquiry/status/{code} accepts lowercase codes."""
     # Create inquiry
-    suffix = datetime.now().strftime("%s%f")[5:12]
+    suffix = f"{time_ns() % 10_000_000:07d}"
     payload = {
         "first_name": "Case",
         "last_name": f"Test{suffix}",
@@ -247,7 +254,13 @@ def test_status_check_inquiry_code_is_case_insensitive(client):
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
 
     # Fetch with lowercase
-    response = client.get(f"/api/v1/public/student/inquiry/status/{inquiry_code.lower()}")
+    response = client.get(
+        f"/api/v1/public/student/inquiry/status/{inquiry_code.lower()}",
+        headers={
+            "X-Parent-Email": payload["email"],
+            "X-Parent-Mobile": payload["parent_mobile"],
+        },
+    )
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["inquiry_code"] == inquiry_code
