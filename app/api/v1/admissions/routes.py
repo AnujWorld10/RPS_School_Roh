@@ -11,13 +11,10 @@ from app.api.deps import require_permissions
 from app.core.pagination import PaginationParams, pagination_params
 from app.core.responses import paginated_response, success_response
 from app.db.session import get_db
-from app.models.enums import DocumentType
 from app.models.user import User
 from app.schemas.admissions import (
-    AdmissionCreateRequest,
     AdmissionDocumentResponse,
     AdmissionResponse,
-    AdmissionUpdateRequest,
     DocumentVerifyRequest,
     InquiryAdmissionCreateRequest,
     InquiryAdmissionResponse,
@@ -25,7 +22,6 @@ from app.schemas.admissions import (
     RequiredDocumentsResponse,
 )
 from app.schemas.common import RejectionRequest
-from app.schemas.enrollment import EnrollmentResponse
 from app.services.admissions import AdmissionService
 from app.services.enrollment import EnrollmentService
 from app.services.inquiry_admissions import InquiryAdmissionService
@@ -128,8 +124,8 @@ def upload_admission_document(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("admissions.update"))],
-    document_type: str = Form(...),
-    file: UploadFile = File(...),
+    document_type: Annotated[str, Form()],
+    file: Annotated[UploadFile, File()],
 ):
     doc = InquiryAdmissionService(db).upload_document(
         admission_id, document_type, file, request

@@ -1,9 +1,9 @@
 """Domain enumerations used across ORM models and Pydantic schemas."""
 
-import enum
+from enum import StrEnum
 
 
-class UserStatus(str, enum.Enum):
+class UserStatus(StrEnum):
     """Lifecycle state of a platform user account."""
 
     ACTIVE = "active"
@@ -11,14 +11,14 @@ class UserStatus(str, enum.Enum):
     LOCKED = "locked"
 
 
-class ClassStatus(str, enum.Enum):
+class ClassStatus(StrEnum):
     """Whether a school class record is open for admissions."""
 
     ACTIVE = "active"
     INACTIVE = "inactive"
 
 
-class StudentStatus(str, enum.Enum):
+class StudentStatus(StrEnum):
     """Enrollment lifecycle for a registered student."""
 
     PROSPECTIVE = "prospective"
@@ -28,7 +28,7 @@ class StudentStatus(str, enum.Enum):
     TRANSFERRED = "transferred"
 
 
-class AdmissionStatus(str, enum.Enum):
+class AdmissionStatus(StrEnum):
     """Workflow state of an inquiry-linked admission application."""
 
     DRAFT = "draft"
@@ -39,7 +39,7 @@ class AdmissionStatus(str, enum.Enum):
     REJECTED = "rejected"
 
 
-class Gender(str, enum.Enum):
+class Gender(StrEnum):
     """Student gender values accepted on public inquiry forms."""
 
     MALE = "male"
@@ -47,7 +47,7 @@ class Gender(str, enum.Enum):
     OTHER = "other"
 
 
-class InquiryStatus(str, enum.Enum):
+class InquiryStatus(StrEnum):
     """
     End-to-end pipeline status for a student admission inquiry.
 
@@ -108,14 +108,14 @@ INQUIRY_ADMIN_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
-class InterviewMode(str, enum.Enum):
+class InterviewMode(StrEnum):
     """How the interview or test is conducted."""
 
     ONLINE = "ONLINE"
     OFFLINE = "OFFLINE"
 
 
-class InterviewResult(str, enum.Enum):
+class InterviewResult(StrEnum):
     """Outcome of a scheduled interview (null until completed)."""
 
     SCHEDULED = "SCHEDULED"
@@ -124,7 +124,7 @@ class InterviewResult(str, enum.Enum):
     ABSENT = "ABSENT"
 
 
-class InterviewResultUpdate(str, enum.Enum):
+class InterviewResultUpdate(StrEnum):
     """Allowed values when staff records interview outcome."""
 
     PASSED = "PASSED"
@@ -132,7 +132,7 @@ class InterviewResultUpdate(str, enum.Enum):
     ABSENT = "ABSENT"
 
 
-class DocumentType(str, enum.Enum):
+class DocumentType(StrEnum):
     """Required admission document types per FRD."""
 
     PROGRESS_REPORT = "progress_report"
@@ -146,7 +146,7 @@ class DocumentType(str, enum.Enum):
 REQUIRED_ADMISSION_DOCUMENTS: frozenset[str] = frozenset(d.value for d in DocumentType)
 
 
-class DocumentVerificationStatus(str, enum.Enum):
+class DocumentVerificationStatus(StrEnum):
     """Staff verification state for an uploaded document."""
 
     PENDING = "PENDING"
@@ -154,25 +154,25 @@ class DocumentVerificationStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
-class TeacherStatus(str, enum.Enum):
+class TeacherStatus(StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     RESIGNED = "resigned"
 
 
-class AttendanceStatus(str, enum.Enum):
+class AttendanceStatus(StrEnum):
     PRESENT = "present"
     ABSENT = "absent"
     LEAVE = "leave"
     HALF_DAY = "half_day"
 
 
-class SalaryStatus(str, enum.Enum):
+class SalaryStatus(StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
 
 
-class PaymentStatus(str, enum.Enum):
+class PaymentStatus(StrEnum):
     PENDING = "pending"
     PAID = "paid"
     FAILED = "failed"

@@ -1,4 +1,4 @@
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from sqlalchemy import Select, asc, desc, func, select
 from sqlalchemy.orm import Session
@@ -6,10 +6,8 @@ from sqlalchemy.orm import Session
 from app.core.pagination import PaginatedResult, PaginationParams
 from app.db.base import Base
 
-ModelT = TypeVar("ModelT", bound=Base)
 
-
-class BaseRepository(Generic[ModelT]):
+class BaseRepository[ModelT: Base]:
     def __init__(self, session: Session, model: type[ModelT]) -> None:
         self.session = session
         self.model = model
@@ -44,7 +42,5 @@ class BaseRepository(Generic[ModelT]):
         if sort_column is not None:
             order = asc(sort_column) if params.sort_order == "asc" else desc(sort_column)
             query = query.order_by(order)
-        items = list(
-            self.session.scalars(query.offset(params.offset).limit(params.limit)).all()
-        )
+        items = list(self.session.scalars(query.offset(params.offset).limit(params.limit)).all())
         return PaginatedResult(items=items, total=total, page=params.page, limit=params.limit)

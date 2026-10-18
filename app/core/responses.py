@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ResponseMeta(BaseModel):

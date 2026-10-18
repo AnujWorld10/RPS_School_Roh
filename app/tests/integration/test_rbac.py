@@ -1,7 +1,5 @@
 """Integration tests for role-based access control (RBAC) and permissions."""
 
-import pytest
-
 
 def test_register_requires_admin_role(client):
     """POST /register without ADMIN role returns 403 or 401."""
@@ -96,7 +94,7 @@ def test_upload_admission_document_requires_permission(client):
 
 
 def test_verify_document_requires_special_permission(client, auth_headers):
-    """POST /admissions/documents/{id}/verify without admissions.verify_documents permission fails."""
+    """Verify document endpoint requires the admissions.verify_documents permission."""
     response = client.post(
         "/api/v1/admissions/documents/1/verify?verified=true",
         headers=auth_headers,

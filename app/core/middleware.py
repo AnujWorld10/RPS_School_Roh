@@ -6,7 +6,7 @@ from collections.abc import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.logging.context import request_log_extra, resolve_path_template
+from app.core.logging.context import request_log_extra
 
 logger = logging.getLogger("app.request")
 
@@ -17,7 +17,6 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         request.state.request_id = request_id
-        path = resolve_path_template(request)
         base_extra = request_log_extra(request)
 
         logger.info(

@@ -2,17 +2,16 @@
 Business logic for scheduling interviews and recording results.
 """
 
-from datetime import date, time
 
 from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessRuleException, NotFoundException
 from app.core.transactions import transaction
-from app.models.enums import InquiryStatus, InterviewMode, InterviewResult
+from app.models.enums import InquiryStatus, InterviewResult
 from app.models.interview import InterviewSchedule
-from app.repositories.interviews import InterviewRepository
 from app.repositories.inquiries import StudentInquiryRepository
+from app.repositories.interviews import InterviewRepository
 from app.repositories.teachers import TeacherRepository
 from app.schemas.interviews import InterviewCreateRequest, InterviewResultUpdateRequest
 from app.services.audit import AuditService
