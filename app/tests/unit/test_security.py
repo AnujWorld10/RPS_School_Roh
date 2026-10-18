@@ -29,8 +29,9 @@ def test_access_token_is_compact_and_contains_required_claims():
     token = create_access_token(user_id=123456789)
     payload = decode_token(token)
 
-    assert len(token) <= 140
+    assert len(token) <= 200
     assert payload["sub"] == "123456789"
+    assert payload["jti"]
     assert "exp" in payload
     assert "type" not in payload
     assert "email" not in payload

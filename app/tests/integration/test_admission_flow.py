@@ -41,7 +41,13 @@ def test_admission_flow_from_inquiry_creation_to_submission(client, db_session, 
     assert inquiry_data["status"] == "PENDING"
 
     # Step 2: Verify status can be retrieved by inquiry_code
-    status_resp = client.get(f"/api/v1/public/student/inquiry/status/{inquiry_code}")
+    status_resp = client.get(
+        f"/api/v1/public/student/inquiry/status/{inquiry_code}",
+        headers={
+            "X-Parent-Email": payload["email"],
+            "X-Parent-Mobile": payload["parent_mobile"],
+        },
+    )
     assert status_resp.status_code == 200
     status_data = status_resp.json()["data"]
     assert status_data["inquiry_code"] == inquiry_code
@@ -167,7 +173,7 @@ def test_admin_can_list_query_admissions(client, auth_headers):
     GET /admissions/inquiry-admissions with admin token returns paginated results.
     """
     response = client.get(
-        "/api/v1/admissions/inquiry-admissions",
+        "/api/v1/inquiry-admissions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -183,7 +189,7 @@ def test_admin_can_filter_admissions_by_status(client, auth_headers):
     GET /admissions/inquiry-admissions?status=SUBMITTED filters by status.
     """
     response = client.get(
-        "/api/v1/admissions/inquiry-admissions?status=SUBMITTED",
+        "/api/v1/inquiry-admissions?status=SUBMITTED",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -196,7 +202,7 @@ def test_admin_can_filter_admissions_by_academic_year(client, auth_headers):
     GET /admissions/inquiry-admissions?academic_year=2024-2025 filters by year.
     """
     response = client.get(
-        "/api/v1/admissions/inquiry-admissions?academic_year=2024-2025",
+        "/api/v1/inquiry-admissions?academic_year=2024-2025",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -209,7 +215,7 @@ def test_admin_can_paginate_admissions(client, auth_headers):
     GET /admissions/inquiry-admissions?page=1&limit=10 returns paginated results.
     """
     response = client.get(
-        "/api/v1/admissions/inquiry-admissions?page=1&limit=10",
+        "/api/v1/inquiry-admissions?page=1&limit=10",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -224,7 +230,7 @@ def test_required_documents_lists_all_types(client):
     """
     GET /admissions/documents/required lists all required document types.
     """
-    response = client.get("/api/v1/admissions/documents/required")
+    response = client.get("/api/v1/documents/required")
     assert response.status_code == 200
     body = response.json()
     assert body["success"] is True
@@ -299,7 +305,13 @@ def test_inquiry_status_timeline_records_transitions(client):
     inquiry_code = create_resp.json()["data"]["inquiry_code"]
 
     # Retrieve status (which shows timeline)
-    status_resp = client.get(f"/api/v1/public/student/inquiry/status/{inquiry_code}")
+    status_resp = client.get(
+        f"/api/v1/public/student/inquiry/status/{inquiry_code}",
+        headers={
+            "X-Parent-Email": payload["email"],
+            "X-Parent-Mobile": payload["parent_mobile"],
+        },
+    )
     assert status_resp.status_code == 200
     data = status_resp.json()["data"]
     assert "status_timeline" in data
@@ -328,7 +340,13 @@ def test_duplicate_inquiry_submission_on_same_data_fails(client):
     assert create_resp2.status_code == 409  # Conflict
     body = create_resp2.json()
     assert body["success"] is False
+    detail = body.get("detail", "").lower()
+    error_messages = " ".join(
+        error.get("message", "") for error in body.get("errors", [])
+    ).lower()
     assert (
-        "already exists" in body.get("detail", "").lower()
-        or "duplicate" in body.get("detail", "").lower()
+        "already exists" in detail
+        or "duplicate" in detail
+        or "already exists" in error_messages
+        or "duplicate" in error_messages
     )

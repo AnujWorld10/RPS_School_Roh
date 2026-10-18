@@ -25,6 +25,7 @@ def test_register_with_admin_token_succeeds(client, auth_headers):
             "password": "StaffPass@123",
             "first_name": "Staff",
             "last_name": "Member",
+            "role_codes": ["TEACHER"],
         },
         headers=auth_headers,
     )
@@ -38,14 +39,14 @@ def test_register_with_admin_token_succeeds(client, auth_headers):
 
 def test_list_inquiry_admissions_requires_permission(client):
     """GET /admissions/inquiry-admissions without permission returns 403."""
-    response = client.get("/api/v1/admissions/inquiry-admissions")
+    response = client.get("/api/v1/inquiry-admissions")
     assert response.status_code in [401, 403]
 
 
 def test_list_inquiry_admissions_with_permission_succeeds(client, auth_headers):
     """GET /admissions/inquiry-admissions with admin token succeeds."""
     response = client.get(
-        "/api/v1/admissions/inquiry-admissions",
+        "/api/v1/inquiry-admissions",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -57,7 +58,7 @@ def test_list_inquiry_admissions_with_permission_succeeds(client, auth_headers):
 def test_create_inquiry_admission_requires_permission(client):
     """POST /admissions/inquiries/{id}/admission without permission returns 403."""
     response = client.post(
-        "/api/v1/admissions/inquiries/1/admission",
+        "/api/v1/inquiries/1/admission",
         json={
             "class_id": 1,
             "section": "A",
@@ -70,7 +71,7 @@ def test_create_inquiry_admission_requires_permission(client):
 def test_create_inquiry_admission_with_permission_requires_valid_inquiry(client, auth_headers):
     """POST /admissions/inquiries/{id}/admission with admin token fails on invalid inquiry."""
     response = client.post(
-        "/api/v1/admissions/inquiries/99999/admission",
+        "/api/v1/inquiries/99999/admission",
         json={
             "class_id": 1,
             "section": "A",
@@ -85,7 +86,7 @@ def test_create_inquiry_admission_with_permission_requires_valid_inquiry(client,
 def test_upload_admission_document_requires_permission(client):
     """POST /admissions/inquiry-admissions/{id}/documents without permission returns 403."""
     response = client.post(
-        "/api/v1/admissions/inquiry-admissions/1/documents",
+        "/api/v1/inquiry-admissions/1/documents",
         data={
             "document_type": "progress_report",
         },
@@ -96,7 +97,7 @@ def test_upload_admission_document_requires_permission(client):
 def test_verify_document_requires_special_permission(client, auth_headers):
     """Verify document endpoint requires the admissions.verify_documents permission."""
     response = client.post(
-        "/api/v1/admissions/documents/1/verify?verified=true",
+        "/api/v1/documents/1/verify?verified=true",
         headers=auth_headers,
     )
     # This should either fail (404 if doc doesn't exist) or pass (if admin has permission)
@@ -107,7 +108,7 @@ def test_verify_document_requires_special_permission(client, auth_headers):
 def test_approve_inquiry_admission_requires_permission(client):
     """POST /admissions/inquiry-admissions/{id}/approve without permission returns 403."""
     response = client.post(
-        "/api/v1/admissions/inquiry-admissions/1/approve",
+        "/api/v1/inquiry-admissions/1/approve",
     )
     assert response.status_code in [401, 403]
 
@@ -115,7 +116,7 @@ def test_approve_inquiry_admission_requires_permission(client):
 def test_reject_inquiry_admission_requires_permission(client):
     """POST /admissions/inquiry-admissions/{id}/reject without permission returns 403."""
     response = client.post(
-        "/api/v1/admissions/inquiry-admissions/1/reject",
+        "/api/v1/inquiry-admissions/1/reject",
         json={"rejection_reason": "Not eligible"},
     )
     assert response.status_code in [401, 403]
@@ -124,21 +125,21 @@ def test_reject_inquiry_admission_requires_permission(client):
 def test_enroll_student_requires_enrollment_permission(client):
     """POST /admissions/inquiry-admissions/{id}/enroll without permission returns 403."""
     response = client.post(
-        "/api/v1/admissions/inquiry-admissions/1/enroll",
+        "/api/v1/inquiry-admissions/1/enroll",
     )
     assert response.status_code in [401, 403]
 
 
 def test_get_inquiry_admission_requires_read_permission(client):
     """GET /admissions/inquiry-admissions/{id} without permission returns 403."""
-    response = client.get("/api/v1/admissions/inquiry-admissions/1")
+    response = client.get("/api/v1/inquiry-admissions/1")
     assert response.status_code in [401, 403]
 
 
 def test_update_inquiry_admission_requires_update_permission(client):
     """PUT /admissions/inquiry-admissions/{id} without permission returns 403."""
     response = client.put(
-        "/api/v1/admissions/inquiry-admissions/1",
+        "/api/v1/inquiry-admissions/1",
         json={"status": "submitted"},
     )
     assert response.status_code in [401, 403]
@@ -146,14 +147,14 @@ def test_update_inquiry_admission_requires_update_permission(client):
 
 def test_list_legacy_admissions_requires_permission(client):
     """GET /admissions/students/admissions/all without permission returns 403."""
-    response = client.get("/api/v1/admissions/students/admissions/all")
+    response = client.get("/api/v1/students/admissions/all")
     assert response.status_code in [401, 403]
 
 
 def test_list_legacy_admissions_with_permission_succeeds(client, auth_headers):
     """GET /admissions/students/admissions/all with admin token succeeds."""
     response = client.get(
-        "/api/v1/admissions/students/admissions/all",
+        "/api/v1/students/admissions/all",
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -163,7 +164,7 @@ def test_list_legacy_admissions_with_permission_succeeds(client, auth_headers):
 
 def test_required_documents_endpoint_is_public(client):
     """GET /admissions/documents/required is public and returns document types."""
-    response = client.get("/api/v1/admissions/documents/required")
+    response = client.get("/api/v1/documents/required")
     assert response.status_code == 200
     body = response.json()
     assert body["success"] is True
@@ -176,8 +177,8 @@ def test_admin_can_access_all_protected_endpoints(client, auth_headers):
     """Super admin token grants access to all protected endpoints."""
     # Test a few protected endpoints
     endpoints = [
-        ("/api/v1/admissions/inquiry-admissions", "GET"),
-        ("/api/v1/admissions/students/admissions/all", "GET"),
+        ("/api/v1/inquiry-admissions", "GET"),
+        ("/api/v1/students/admissions/all", "GET"),
     ]
     for endpoint, method in endpoints:
         if method == "GET":

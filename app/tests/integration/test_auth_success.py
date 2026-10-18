@@ -1,5 +1,8 @@
 """Integration tests for auth success paths and token handling."""
 
+ADMIN_EMAIL = "test-admin@school.com"
+ADMIN_PASSWORD = "TestAdmin@123"
+
 
 
 def test_login_success_returns_tokens(client):
@@ -7,8 +10,8 @@ def test_login_success_returns_tokens(client):
     response = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
-            "password": "SuperAdmin@123",
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD,
         },
     )
     assert response.status_code == 200
@@ -27,8 +30,8 @@ def test_me_returns_profile_after_login(client):
     login_resp = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
-            "password": "SuperAdmin@123",
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD,
         },
     )
     assert login_resp.status_code == 200
@@ -43,7 +46,7 @@ def test_me_returns_profile_after_login(client):
     body = response.json()
     assert body["success"] is True
     data = body["data"]
-    assert data["email"] == "superadmin@school.com"
+    assert data["email"] == ADMIN_EMAIL
     assert "roles" in data
     assert "permissions" in data
     assert data["id"] is not None
@@ -55,8 +58,8 @@ def test_refresh_token_returns_new_access_token(client):
     login_resp = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
-            "password": "SuperAdmin@123",
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD,
         },
     )
     assert login_resp.status_code == 200
@@ -81,8 +84,8 @@ def test_logout_invalidates_refresh_token(client):
     login_resp = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
-            "password": "SuperAdmin@123",
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD,
         },
     )
     assert login_resp.status_code == 200
@@ -111,8 +114,8 @@ def test_verify_token_endpoint_validates_token(client):
     login_resp = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
-            "password": "SuperAdmin@123",
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD,
         },
     )
     assert login_resp.status_code == 200
@@ -143,8 +146,8 @@ def test_change_password_requires_old_password(client):
     login_resp = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
-            "password": "SuperAdmin@123",
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD,
         },
     )
     assert login_resp.status_code == 200
@@ -154,7 +157,7 @@ def test_change_password_requires_old_password(client):
     response = client.post(
         "/api/v1/auth/change-password",
         json={
-            "old_password": "WrongPassword@123",
+            "current_password": "WrongPassword@123",
             "new_password": "NewPassword@123",
         },
         headers={"Authorization": f"Bearer {access_token}"},
@@ -181,7 +184,7 @@ def test_login_with_wrong_password_fails(client):
     response = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "superadmin@school.com",
+            "email": ADMIN_EMAIL,
             "password": "WrongPassword@123",
         },
     )
