@@ -1,17 +1,22 @@
-# School Management System (SMS) — Enterprise Technical Documentation
+# School Management System — Technical Documentation
 
-**Document version:** 0.2.0  
-**Last updated:** May 2026  
+**Last updated:** October 2026  
 **API base URL (local):** `http://127.0.0.1:8000`  
 **API prefix:** `/api/v1`  
 **Interactive OpenAPI (Swagger):** `http://127.0.0.1:8000/docs`  
 **ReDoc:** `http://127.0.0.1:8000/redoc`
 
-> This document is aligned with the current repository structure and runtime behavior, including:  
-> - layered architecture (`Routes → Schemas → Services → Repositories → ORM → MySQL`)  
+> This guide documents the current implementation. Use the generated API and database
+> references for exhaustive field-level details and inspect source where a snapshot or an
+> example needs confirmation. The implemented architecture includes:
+> - layered architecture (`Routes → Schemas → Services → Repositories → ORM → MySQL`)
 > - JWT authentication + RBAC authorization  
 > - daily file logging in `logs/` (including error-only logs + retention)  
 > - inquiry → interview → admission → document verification → enrollment workflow
+
+> This repository previously contained design proposals and historical test and implementation
+> reports. Their unverified or superseded details are not current specifications; current
+> behavior below is based on source, migrations, tests, and the generated references.
 
 ---
 
@@ -19,13 +24,13 @@
 
 1. [Project Overview](#1-project-overview)
 2. [Technology Stack](#2-technology-stack)
-3. [Environment Setup & Prerequisites](#3-prerequisites--environment-setup)
-4. [Complete Project Folder Structure](#4-project-folder-structure)
+3. [Environment Setup & Prerequisites](#3-environment-setup--prerequisites)
+4. [Complete Project Folder Structure](#4-complete-project-folder-structure)
 5. [Configuration & Settings](#5-configuration--settings)
 6. [Database Documentation](#6-database-documentation)
 7. [API Documentation](#7-api-documentation)
 8. [Authentication & Authorization](#8-authentication--authorization)
-9. [Application Workflow Documentation](#9-application-workflows)
+9. [Application Workflow Documentation](#9-application-workflow-documentation)
 10. [Middleware & Exception Handling](#10-middleware--exception-handling)
 11. [Logging & Monitoring](#11-logging--monitoring)
 12. [File Upload & Storage](#12-file-upload--storage)
@@ -34,11 +39,12 @@
 15. [Deployment Documentation](#15-deployment-documentation)
 16. [Performance & Scalability](#16-performance--scalability)
 17. [Security Best Practices](#17-security-best-practices)
-18. [Important Libraries & Utilities](#18-libraries--utilities)
+18. [Important Libraries & Utilities](#18-important-libraries--utilities)
 19. [Future Enhancements](#19-future-enhancements)
-20. [README Alignment](#20-readme-documentation)
+20. [Documentation Maintenance](#20-documentation-maintenance)
 21. [Diagrams](#21-diagrams--visual-documentation)
 22. [Appendix](#22-appendix)
+23. [Verification Checklist](#23-verification-checklist)
 
 ---
 
@@ -46,7 +52,7 @@
 
 ### 1.1 Purpose
 
-The **School Management System (SMS) Backend** is a production-oriented REST API that digitizes the full student admission lifecycle—from public inquiry through interview, document verification, enrollment, and ongoing school operations (classes, students, teachers).
+The **School Management System (SMS) backend** is a REST API that digitizes the full student admission lifecycle—from public inquiry through interview, document verification, enrollment, and ongoing school operations (classes, students, teachers).
 
 The system is designed for:
 
@@ -139,7 +145,7 @@ flowchart TB
 | Language | Python | 3.12+ | Modern typing, ecosystem, team familiarity |
 | API framework | FastAPI | 0.115+ | Performance, OpenAPI auto-docs, Pydantic integration |
 | ASGI server | Uvicorn | 0.32+ | Standard for FastAPI; supports `--reload` in dev |
-| Database | MySQL | 8+ | Relational data, school ops, widely deployed |
+| Database | MySQL | 8.0.16+ | Relational data, school operations, enforced check constraints |
 | ORM | SQLAlchemy | 2.x | Mature 2.0 style, migrations via Alembic |
 | Migrations | Alembic | 1.14+ | Versioned schema changes |
 | Validation | Pydantic | v2 | Request/response DTOs, settings |
@@ -150,7 +156,9 @@ flowchart TB
 | Linting | Ruff | — | Fast Python linter |
 | Containerization | Docker + Compose | — | Reproducible DB/API environments |
 
-**Production recommendations (not all wired in code yet):** Gunicorn + Uvicorn workers, Nginx reverse proxy, Redis cache, Celery for background jobs.
+**Deployment options, not bundled application components:** Gunicorn with Uvicorn workers
+and Nginx can be used in a production deployment. Redis and a job queue are not currently
+implemented.
 
 ---
 
@@ -162,7 +170,7 @@ flowchart TB
 |----------|-----------------|
 | Python | 3.12 |
 | pip | Latest |
-| MySQL Server | 8.0 |
+| MySQL Server | 8.0.16 |
 | Git | Any recent |
 
 Optional: Docker Desktop, VS Code / Cursor.
@@ -175,12 +183,8 @@ CREATE DATABASE IF NOT EXISTS school_db
   COLLATE utf8mb4_unicode_ci;
 ```
 
-Default local credentials (see `.env`):
-
-- User: `root`
-- Password: `mysql`
-- Database: `school_db`
-- Host: `localhost:3306`
+Configure the database URL in `.env` for your own MySQL account and database. Do not rely
+on example credentials; the project does not provision a production database account.
 
 ### 3.3 Virtual Environment
 
@@ -201,8 +205,8 @@ Copy `.env.example` to `.env` and update the settings for your machine:
 | `APP_ENV` | `development` / `test` / `staging` / `production` | `development` |
 | `DEBUG` | FastAPI debug | `true` |
 | `API_V1_PREFIX` | API version prefix | `/api/v1` |
-| `DATABASE_URL` | SQLAlchemy URL | `mysql+pymysql://root:mysql@localhost:3306/school_db` |
-| `JWT_SECRET_KEY` | Signing secret (min 16 chars) | Long random string |
+| `DATABASE_URL` | SQLAlchemy URL for your database | `mysql+pymysql://<user>:<password>@localhost:3306/school_db` |
+| `JWT_SECRET_KEY` | Signing secret; at least 32 random characters in production | Unique random string |
 | `JWT_ALGORITHM` | JWT algorithm | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token TTL | `15` |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token TTL | `30` |
@@ -227,9 +231,9 @@ The manual seed creates:
 - Default roles and permissions
 - **Initial super admin** only when `INITIAL_ADMIN_EMAIL` and
   `INITIAL_ADMIN_PASSWORD` are both configured. Use a unique strong password and
-  remove both settings after the account is created. Existing installations can
-  rotate the legacy seeded super admin by configuring those values for one startup.
-  No default credentials are shipped.
+  remove both settings after the account is created. The settings are consumed when the
+  seed operation runs; setting them alone does not create an account. No default
+  administrator credentials are shipped.
 
 ### 3.6 Run Locally
 
@@ -322,7 +326,7 @@ http://localhost:8000/ready
 - Host: `127.0.0.1`
 - Port: `3307`
 - User: `root`
-- Password: `mysql`
+- Password: the `MYSQL_ROOT_PASSWORD` value configured for Compose
 - Database: `school_db`
 
 7. Stop services:
@@ -375,7 +379,7 @@ SCHOOL_MANAGEMENT/
 │   ├── db/
 │   │   ├── base.py               # Declarative Base, mixins
 │   │   ├── session.py            # Engine, SessionLocal, get_db
-│   │   └── seed.py               # Roles, permissions, super admin
+│   │   └── seed.py               # Roles, permissions, initial admin, class catalog
 │   ├── models/                   # SQLAlchemy ORM models
 │   ├── schemas/                  # Pydantic request/response DTOs
 │   ├── repositories/             # Data access layer
@@ -385,10 +389,17 @@ SCHOOL_MANAGEMENT/
 ├── alembic/                      # Database migrations
 │   └── versions/
 ├── docker/                       # Dockerfile, docker-compose.yml
-├── docs/                         # Technical documentation
+├── docs/
+│   ├── api-reference.md                    # Generated from FastAPI OpenAPI
+│   ├── database-schema-reference.md         # Generated from configured live schema
+│   └── technical-documentation.md           # Current implementation and operations guide
 ├── logs/                         # Daily log files (gitignored; .gitkeep kept)
 ├── uploads/                      # Local file uploads (gitignored)
-├── scripts/                      # Operational scripts (seed_db.py, cleanup_logs.py)
+├── scripts/
+│   ├── generate_api_reference.py
+│   ├── generate_database_reference.py
+│   ├── seed_db.py
+│   └── cleanup_logs.py
 ├── .env.example
 ├── alembic.ini
 ├── pyproject.toml
@@ -463,6 +474,8 @@ python scripts/cleanup_logs.py
 | `005_inquiry_history` | `005_create_inquiry_status_history.py` | Recovery: create `inquiry_status_history` if missing |
 | `006_audit_logs` | `006_align_audit_logs.py` | Align `audit_logs` table with ORM fields |
 | `007_refresh_tokens` | `007_align_refresh_tokens.py` | Align `refresh_tokens` (`token_hash`, `updated_at`) and remove raw token storage |
+| `008_duplicate_key` | `008_inquiry_duplicate_key.py` | Add nullable inquiry identity hash and unique duplicate guard |
+| `009_reconcile_orm` | `009_reconcile_orm_schema.py` | Reconcile legacy schema with current ORM and add operational tables/constraints |
 
 #### Migration Safety Notes (Important)
 
@@ -502,366 +515,59 @@ erDiagram
     teachers ||--o{ teacher_salary_payments : receives
 ```
 
-### 6.3 Core Tables
+### 6.3 Table and Column Reference
 
-#### `users`
+The [generated database schema reference](database-schema-reference.md) is the detailed
+field-level catalog: every table and column, live MySQL type, nullability, default,
+auto-generation, primary/foreign keys, unique/index/check constraints, descriptions, and
+detected ORM differences. It is a snapshot of the configured database, not a migration
+specification. Regenerate it only after confirming the configured database is the intended
+target:
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | BIGINT | PK, AI | Internal ID |
-| first_name | VARCHAR(100) | NOT NULL | |
-| last_name | VARCHAR(100) | NOT NULL | |
-| email | VARCHAR(255) | UNIQUE, NOT NULL | Login identifier |
-| phone | VARCHAR(30) | UNIQUE, NULL | |
-| password_hash | VARCHAR(255) | NOT NULL | Argon2 hash |
-| status | VARCHAR(50) | NOT NULL | active, inactive, locked |
-| last_login_at | DATETIME | NULL | |
-| deleted_at | DATETIME | NULL | Soft delete |
-| created_at, updated_at | DATETIME | | Audit timestamps |
+```powershell
+python scripts\generate_database_reference.py
+```
 
-#### `roles` / `permissions` / `user_roles` / `role_permissions`
+The script inspects schema metadata and the applied Alembic revision; it does not migrate
+the database or read application records. The source migrations under `alembic/versions/`
+remain the authority for schema history, and the database snapshot is the authority for the
+currently configured database.
 
-Standard RBAC junction model. Permission code format: `module.action` (e.g. `students.create`).
+Revision `009_reconcile_orm_schema` adds operational teacher/student tables and constraints
+while retaining some legacy columns. Before upgrading a real database, take a backup and
+review the migration. It relies on MySQL `CHECK` enforcement (MySQL 8.0.16+); once the
+application has written data under the reconciled schema, use a tested backup restore for
+rollback rather than assuming a downgrade is safe.
 
-#### `student_inquiries`
+### 6.4 Relationships and Enumerations
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | BIGINT | PK | |
-| inquiry_code | VARCHAR(20) | UNIQUE | e.g. INQ202600001 |
-| serial_number | INT | UNIQUE | Globally monotonic serial |
-| first_name, middle_name, last_name | VARCHAR | | Student name |
-| gender | VARCHAR(20) | | |
-| father_name | VARCHAR(200) | | |
-| date_of_birth | DATE | | |
-| student_mobile, parent_mobile | VARCHAR(30) | | |
-| email | VARCHAR(255) | | |
-| address | TEXT | | |
-| last_school, current_class, admission_for_class | VARCHAR | | Applicant text |
-| admission_for_class_id | BIGINT | FK → classes.id | Optional catalog link |
-| status | VARCHAR(50) | INDEX | Pipeline status |
-| rejection_reason, internal_notes | TEXT | | |
-
-**Indexes:** status, parent_mobile, email, admission_for_class_id
-
-#### `inquiry_status_history`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | BIGINT PK | |
-| inquiry_id | BIGINT FK → student_inquiries | CASCADE |
-| from_status | VARCHAR(50) NULL | Previous |
-| to_status | VARCHAR(50) | New status |
-| changed_by | BIGINT FK → users NULL | Staff or system |
-| change_reason | TEXT | |
-| created_at | DATETIME | |
-
-#### `interview_schedules`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | BIGINT PK | |
-| inquiry_id | BIGINT FK | CASCADE |
-| schedule_date | DATE | |
-| schedule_time | TIME | |
-| location | VARCHAR(255) | |
-| mode | VARCHAR(20) | ONLINE / OFFLINE |
-| interviewer_teacher_id | BIGINT FK → teachers | NULL |
-| remarks | TEXT | |
-| result | VARCHAR(20) | SCHEDULED, PASSED, FAILED, ABSENT |
-
-#### `inquiry_admissions`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | BIGINT PK | |
-| admission_code | VARCHAR(20) UNIQUE | ADM202600001 |
-| inquiry_id | BIGINT FK UNIQUE | One admission per inquiry |
-| class_id | BIGINT FK | Target class |
-| section | VARCHAR(20) | |
-| academic_year | VARCHAR(20) | |
-| status | VARCHAR(50) | draft → submitted → … → approved |
-| permanent_address, temporary_address | TEXT | |
-| nationality, disability, blood_group | VARCHAR | |
-| reason_for_school_change | TEXT | |
-| student_id | BIGINT FK UNIQUE | Set after enrollment |
-| approved_by, approved_at | | Staff approval |
-
-#### `admission_documents`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | BIGINT PK | |
-| admission_id | BIGINT FK | |
-| document_type | VARCHAR(50) | progress_report, transfer_certificate, … |
-| file_name, file_path | VARCHAR | Storage metadata |
-| verification_status | VARCHAR(20) | PENDING, VERIFIED, REJECTED |
-| verified_by, verified_at | | |
-
-**Unique:** `(admission_id, document_type)`
-
-#### `students` (extended)
-
-| Column | Type | Description |
-|--------|------|-------------|
-| student_code | VARCHAR(20) UNIQUE | STU202600001 |
-| inquiry_id | BIGINT FK UNIQUE | Source inquiry |
-| roll_number | INT | Unique per class + academic_year |
-| class_id, academic_year | | Enrollment target |
-
-See ORM models in `app/models/` for full field lists on `classes`, `teachers`, `subjects`, `audit_logs`, `refresh_tokens`.
-
-### 6.4 Inquiry Status Values
-
-`PENDING` → `UNDER_REVIEW` → `PROCESSING` → `INTERVIEW_SCHEDULED` → `INTERVIEW_PASS` | `INTERVIEW_FAIL` → `DOCUMENT_PENDING` → `DOCUMENT_VERIFICATION` → `ADMISSION_SUCCESS` | `REJECTED`
+The entity relationships are shown in the ER diagram above. Database-enforced keys and
+constraints are listed in the [database schema reference](database-schema-reference.md);
+API enum values and field validation are in the [API reference](api-reference.md).
 
 ---
 
 ## 7. API Documentation
 
-### 7.1 Standard Response Envelope
+The generated [API reference](api-reference.md) is the operation-level catalog for the
+current OpenAPI contract: method/path, authentication and permission notes, parameters,
+request schema, field-level types and constraints, response status/schema, and illustrative
+request/success/error bodies. The running `/openapi.json` and `/docs` remain authoritative.
+Refresh the checked-in Markdown snapshot after route or schema changes with:
 
-All endpoints return:
-
-**Success:**
-
-```json
-{
-  "success": true,
-  "message": "Operation completed successfully",
-  "data": { },
-  "errors": null,
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-05-26T10:00:00Z"
-  }
-}
+```powershell
+python scripts\generate_api_reference.py
 ```
 
-**Paginated:**
+The API uses a shared JSON envelope. Success responses contain `success`, `message`,
+`data`, and request metadata; paginated responses also include `pagination`. Error responses
+contain `success: false`, `message`, `data: null`, `errors[]`, and request metadata. The
+reference contains representative examples; exact error statuses still depend on each
+route's rules and runtime handlers.
 
-```json
-{
-  "success": true,
-  "message": "Records fetched successfully",
-  "data": [],
-  "pagination": {
-    "page": 1,
-    "limit": 10,
-    "total_records": 100,
-    "total_pages": 10
-  },
-  "errors": null,
-  "meta": { "request_id": "...", "timestamp": "..." }
-}
-```
-
-**Error:**
-
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "data": null,
-  "errors": [
-    { "code": "VALIDATION_ERROR", "field": "email", "message": "Invalid email" }
-  ],
-  "meta": { "request_id": "...", "timestamp": "..." }
-}
-```
-
-### 7.2 Common Headers
-
-| Header | Required | Description |
-|--------|----------|-------------|
-| `Authorization` | Protected routes | `Bearer <access_token>` |
-| `Content-Type` | POST/PUT with body | `application/json` or `multipart/form-data` |
-| `X-Request-ID` | Optional | Client-supplied; echoed in response |
-
-### 7.3 Error Codes
-
-| Code | HTTP | Meaning |
-|------|------|---------|
-| `VALIDATION_ERROR` | 422 | Pydantic / business validation |
-| `AUTH_INVALID_CREDENTIALS` | 401 | Bad login |
-| `AUTH_TOKEN_EXPIRED` | 401 | JWT expired |
-| `AUTH_TOKEN_INVALID` | 401 | Invalid JWT |
-| `AUTH_FORBIDDEN` | 403 | Missing permission |
-| `RESOURCE_NOT_FOUND` | 404 | Entity not found |
-| `RESOURCE_CONFLICT` | 409 | Duplicate / constraint |
-| `BUSINESS_RULE_VIOLATION` | 422 | Workflow rule failed |
-| `INTERNAL_SERVER_ERROR` | 500 | Unhandled error |
-
-### 7.4 Endpoint Catalog
-
-Base: `/api/v1` unless noted. **Auth:** None | Bearer | Permission code.
-
-#### Health
-
-| Method | URL | Auth | Purpose |
-|--------|-----|------|---------|
-| GET | `/live` | None | Process liveness; does not require database |
-| GET | `/ready` | None | Readiness check with live database probe |
-| GET | `/health` | None | Backward-compatible readiness check |
-
-#### Public — Student
-
-| Method | URL | Auth | Purpose |
-|--------|-----|------|---------|
-| POST | `/public/student/inquiry` | None | Submit inquiry |
-| GET | `/public/student/inquiry/status/{inquiry_code}` | Parent email/mobile headers | Track status |
-| PUT | `/public/student/inquiry/update` | None | Update inquiry (verified) |
-| POST | `/public/student/admission` | None | Submit admission (form) |
-
-**Example — Create inquiry:**
-
-```http
-POST /api/v1/public/student/inquiry
-Content-Type: application/json
-
-{
-  "first_name": "Aarav",
-  "last_name": "Sharma",
-  "gender": "male",
-  "father_name": "Rohit Sharma",
-  "dob": "2018-04-10",
-  "parent_mobile": "+911234567890",
-  "email": "parent@example.com",
-  "address": "123 School Road",
-  "last_school": "ABC School",
-  "current_class": "Grade 4",
-  "admission_for_class": "Grade 5"
-}
-```
-
-**Success `data`:**
-
-```json
-{
-  "inquiry_code": "INQ202600001",
-  "status": "PENDING"
-}
-```
-
-**Public status lookup** requires both contact headers from inquiry submission:
-
-```http
-GET /api/v1/public/student/inquiry/status/INQ202600001
-X-Parent-Email: parent@example.com
-X-Parent-Mobile: +911234567890
-```
-
-#### Auth
-
-| Method | URL | Auth | Permission |
-|--------|-----|------|------------|
-| POST | `/auth/login` | None | — |
-| POST | `/auth/refresh-token` | None | — |
-| POST | `/auth/register` | Bearer | SUPER_ADMIN, ADMIN |
-| GET | `/auth/me` | Bearer | Any active user |
-| POST | `/auth/change-password` | Bearer | Any active user |
-| POST | `/auth/logout` | Bearer | Any active user |
-| GET | `/auth/verify-token` | Bearer | Any active user |
-
-**Login body** (use the configured bootstrap credentials):
-
-```json
-{ "email": "configured-admin@example.com", "password": "configured-strong-password" }
-```
-
-**Login success `data`:**
-
-```json
-{
-  "access_token": "...",
-  "refresh_token": "...",
-  "token_type": "bearer",
-  "expires_in": 900
-}
-```
-
-#### Inquiries (Staff)
-
-| Method | URL | Permission |
-|--------|-----|------------|
-| GET | `/inquiries` | inquiries.read |
-| GET | `/inquiries/{id}` | inquiries.read |
-| PUT | `/inquiries/{id}` | inquiries.update |
-| POST | `/inquiries/{id}/review/start` | inquiries.update |
-| POST | `/inquiries/{id}/review/process` | inquiries.update |
-| POST | `/inquiries/{id}/reject` | inquiries.reject |
-
-Query params for list: `page`, `limit`, `status`, `admission_for_class_id`, `search`
-
-#### Interviews
-
-| Method | URL | Permission |
-|--------|-----|------------|
-| POST | `/interviews/inquiries/{inquiry_id}/schedule` | interviews.schedule |
-| GET | `/interviews/inquiries/{inquiry_id}` | interviews.read |
-| POST | `/interviews/{interview_id}/result` | interviews.update |
-| GET | `/interviews/{interview_id}` | interviews.read |
-
-**Schedule body:**
-
-```json
-{
-  "schedule_date": "2026-06-15",
-  "schedule_time": "10:30:00",
-  "location": "Room 101",
-  "mode": "OFFLINE",
-  "interviewer_teacher_id": 1,
-  "remarks": "Bring previous report card"
-}
-```
-
-**Result body:**
-
-```json
-{ "result": "PASSED", "remarks": "Good performance" }
-```
-
-#### Admissions & Enrollment
-
-| Method | URL | Permission |
-|--------|-----|------------|
-| GET | `/inquiry-admissions` | admissions.read |
-| POST | `/inquiries/{inquiry_id}/admission` | admissions.create |
-| GET | `/inquiry-admissions/{id}` | admissions.read |
-| PUT | `/inquiry-admissions/{id}` | admissions.update |
-| POST | `/inquiry-admissions/{id}/documents` | admissions.update (multipart) |
-| POST | `/documents/{id}/verify?verified=true` | admissions.verify_documents |
-| GET | `/documents/required` | None |
-| POST | `/inquiry-admissions/{id}/approve` | admissions.approve |
-| POST | `/inquiry-admissions/{id}/reject` | admissions.reject |
-| POST | `/inquiry-admissions/{id}/enroll` | enrollment.create |
-
-**Required document types:** `progress_report`, `transfer_certificate`, `migration_certificate`, `character_certificate`, `student_aadhar`, `parent_aadhar`
-
-**Enrollment success `data`:**
-
-```json
-{
-  "student_id": 1,
-  "student_code": "STU202600001",
-  "admission_code": "ADM202600001",
-  "inquiry_code": "INQ202600001",
-  "class_id": 1,
-  "section": "A",
-  "academic_year": "2026-2027",
-  "roll_number": 1
-}
-```
-
-#### Classes, Students, Teachers
-
-See OpenAPI at `/docs` for full request schemas. Summary:
-
-| Module | Base path | Key operations |
-|--------|-----------|----------------|
-| Classes | `/classes` | CRUD, list with filters |
-| Students | `/students` | CRUD, status, class assign, soft delete |
-| Teachers | `/teachers` | CRUD, subject/class assign, attendance, salary |
+Clients send `Authorization: Bearer <access-token>` to protected routes. Public inquiry
+status lookup and update use the applicant's inquiry code, email, and parent mobile for
+verification; see the operation-specific header/body details in the API reference.
 
 ---
 
@@ -918,10 +624,10 @@ Seed data: `app/core/permissions.py`
 
 ### 8.4 Initial Admin
 
-The first SUPER_ADMIN is created only when both `INITIAL_ADMIN_EMAIL` and
-`INITIAL_ADMIN_PASSWORD` are configured. There are no built-in default credentials.
-For upgrades with the former built-in account, configure its email and a new strong
-password for one startup to rotate its credentials, then remove both settings.
+The seed operation creates or updates the initial SUPER_ADMIN only when both
+`INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` are configured. Seeding is manual unless
+`SEED_ON_STARTUP=true`; configuring the values alone does not create an account. There are
+no built-in default credentials.
 
 Registration requires existing SUPER_ADMIN or ADMIN.
 
@@ -966,6 +672,40 @@ stateDiagram-v2
 ### 9.4 Employee Hiring Workflow
 
 **Status:** Planned (Phase 4). Not implemented in current codebase.
+
+### 9.5 Current implementation rules verified from source
+
+- Duplicate identity is based on first name, last name, father/guardian name, and date of
+  birth. The three names have whitespace collapsed and are case-folded; DOB is serialized as
+  ISO date. The canonical identity JSON is SHA-256 hashed into `duplicate_key`. Email,
+  phone, middle name, and gender are not part of duplicate identity.
+- The nullable unique index on `duplicate_key` is the concurrency guard for active keyed
+  inquiries. The repository also checks legacy rows without relying on a key. If a database
+  integrity error occurs during submission, the service checks whether a duplicate explains
+  the conflict and returns the duplicate conflict when it does; unrelated integrity errors
+  are not silently converted.
+- `REJECTED` and `INTERVIEW_FAIL` inquiries release the identity key and allow a new
+  application. Those original inquiry records remain locked; reapplication creates a new
+  inquiry. An identical first/last/guardian/DOB combination—including twins with identical
+  names and DOB—cannot be distinguished by the current identity fields and may be treated
+  as a duplicate; this requires a separate identity policy if it must be supported.
+- An admission can be opened only after `INTERVIEW_PASS`. Creating it sets the admission
+  to `submitted` and moves the inquiry to `DOCUMENT_PENDING`.
+- The six required document types are `progress_report`, `transfer_certificate`,
+  `migration_certificate`, `character_certificate`, `student_aadhar`, and `parent_aadhar`.
+  All six must be uploaded and verified before the admission can be approved. Replacing a
+  document resets its verification and may return the workflow to document pending.
+- Enrollment requires an approved admission, all six documents verified, an active target
+  class, and available class capacity. Enrollment creates the student and class/year roll
+  number, links the student to the admission, and moves the inquiry to `ADMISSION_SUCCESS`.
+- `INTERVIEW_FAIL`, `REJECTED`, and `ADMISSION_SUCCESS` are locked states for edits to the
+  original inquiry. Reapplication, when allowed by the duplicate-key rule above, is a new
+  inquiry rather than an edit to that locked record.
+
+The duplicate behavior is covered by unit tests for exact and case-insensitive matches,
+different names/DOB, reapplication after rejection/interview failure, and the service
+conflict path. A duplicate submission returns HTTP 409 with the standard error envelope;
+see the shared runtime error examples in the API reference.
 
 ---
 
@@ -1019,7 +759,8 @@ Global handlers are registered in `app/core/handlers.py` and ensure:
 
 ### 10.4 Standardized Error Response
 
-All errors are returned in the same envelope shape (see Section 7.1). For example:
+All errors are returned in the shared envelope described in Section 7 and illustrated in
+the API reference:
 
 ```json
 {
@@ -1034,17 +775,6 @@ All errors are returned in the same envelope shape (see Section 7.1). For exampl
   }
 }
 ```
-
-| Aspect | Implementation |
-|--------|----------------|
-| Format | JSON lines to daily files under `logs/` (and optional stdout) |
-| Main daily file | `logs/RPS_YYYY-MM-DD.log` |
-| Error-only file | `logs/RPS_ERROR_YYYY-MM-DD.log` |
-| Retention | `LOG_RETENTION_DAYS` (startup cleanup + manual script `scripts/cleanup_logs.py`) |
-| Request ID | `RequestIDMiddleware` — header `X-Request-ID` |
-| Audit | `audit_logs` table via `AuditService` |
-| Liveness | `GET /live` — process responds; no database dependency |
-| Readiness | `GET /ready` and `GET /health` — execute database `SELECT 1`; HTTP 503 when unavailable |
 
 **Recommendations (production):** ship JSON logs to a centralized platform (ELK/OpenSearch, Loki, CloudWatch, Datadog), add error tracking (Sentry), and metrics/tracing (Prometheus + OpenTelemetry).
 
@@ -1098,6 +828,14 @@ Request lifecycle events are produced by `RequestIDMiddleware`:
 In addition to runtime logs, sensitive actions are captured in the **`audit_logs`** table via `AuditService`.
 
 Use audit logs for compliance and business traceability; use file/stdout logs for operational troubleshooting.
+
+| Concern | Implementation |
+|---------|----------------|
+| Request correlation | `RequestIDMiddleware` sets/echoes `X-Request-ID` |
+| Retention | `LOG_RETENTION_DAYS`; startup cleanup and `python scripts/cleanup_logs.py` |
+| Audit trail | `audit_logs` table via `AuditService` |
+| Liveness | `GET /live` does not require the database |
+| Readiness | `GET /ready` and `GET /health` execute `SELECT 1`; HTTP 503 when unavailable |
 
 ### 11.6 Monitoring Recommendations (Enterprise)
 
@@ -1181,21 +919,29 @@ Use a background/job system for:
 pytest
 pytest app/tests/unit -v
 pytest app/tests/integration -v
+ruff check app
 ```
 
-| Path | Purpose |
-|------|---------|
-| `app/tests/conftest.py` | SQLite in-memory DB, TestClient, seed |
-| `app/tests/unit/` | Security, ID generation |
-| `app/tests/integration/` | Health, auth, public inquiry |
+CI runs Ruff, applies Alembic migrations to its MySQL 8.4 service, and runs pytest. The test
+suite uses in-memory SQLite fixtures for isolation and includes coverage for:
 
-**Default test login:** Uses seeded super admin when MySQL seed available; SQLite for isolated tests.
+- Auth tokens and RBAC/access controls.
+- Public inquiry validation, duplicate identity, status history and transitions.
+- Interview scheduling and pass/fail/absent outcomes.
+- Admission submission, required documents, and workflow restrictions.
+- File upload size/extension handling, security helpers and structured logging.
+- Salary amount calculations, enum validation, schema/database constraints, and health probes.
+
+The test suite is not a substitute for deployment-specific checks against the configured
+MySQL version and storage environment. Use CI as the current test result authority; old
+test counts and production-readiness ratings in the removed historical review are not
+current project measurements.
 
 ---
 
 ## 15. Deployment Documentation
 
-### 14.1 Local
+### 15.1 Local
 
 ```powershell
 pip install -e .
@@ -1203,7 +949,7 @@ alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 14.2 Docker Compose and Release Migrations
+### 15.2 Docker Compose and Release Migrations
 
 ```powershell
 docker compose -f docker/docker-compose.yml up -d db
@@ -1252,7 +998,7 @@ docker compose -f docker/docker-compose.yml down -v
 The `down -v` command also deletes uploaded documents from `school_uploads`; use it only when
 deleting both database and file data is intentional.
 
-### 14.3 Health Probes and Public Endpoint Protection
+### 15.3 Health Probes and Public Endpoint Protection
 
 | Endpoint | Probe purpose | Database required | Failure behavior |
 |----------|---------------|-------------------|------------------|
@@ -1265,7 +1011,7 @@ API replicas. Apply per-client limits to public submission routes, set a request
 above `MAX_UPLOAD_SIZE_MB` for multipart overhead, and trust forwarded client-IP headers only from
 known proxy or load-balancer addresses. Tune thresholds against expected production traffic.
 
-### 14.4 Production (Recommended)
+### 15.4 Production (Recommended)
 
 ```text
 Nginx (TLS) → Gunicorn (UvicornWorker) → FastAPI
@@ -1281,9 +1027,43 @@ Example Gunicorn:
 gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000
 ```
 
-### 14.4 CI
+### 15.5 CI
 
-`.github/workflows/ci.yml` — MySQL service, Ruff, pytest, Alembic.
+`.github/workflows/ci.yml` runs Ruff, migrations, and pytest against MySQL 8.4. The CI
+workflow is the canonical automated test and migration check.
+
+#### Migration and schema change notes
+
+Revision `009_reconcile_orm_schema` aligned operational tables and constraints with the
+registered models, retained selected legacy columns, and backfilled required identity fields
+from linked accounts. It added teacher/class assignments, attendance, and salary tables;
+the API and database both enforce salary payment arithmetic
+`net_amount = gross_amount - deduction_amount` and the applicable nonnegative amount bounds.
+The migration is forward-only after writes rely on the reconciled schema; back up first and
+use a tested restore for rollback.
+
+Collection queries use `selectinload` for inquiry history/interviews, admission documents,
+and student classes to avoid per-record relationship queries.
+
+#### Reverse-proxy protection for public routes
+
+Public route rate limiting belongs at a shared ingress/WAF so it applies across API replicas.
+Set the body-size cap slightly above `MAX_UPLOAD_SIZE_MB` to account for multipart overhead,
+and trust forwarded client IP headers only from known proxies. Example Nginx starting point:
+
+```nginx
+limit_req_zone $binary_remote_addr zone=school_public_forms:10m rate=10r/m;
+
+location ~ ^/api/v1/public/student/(inquiry(?:/.*)?|admission)$ {
+    client_max_body_size 6m;
+    limit_req zone=school_public_forms burst=10 nodelay;
+    limit_req_status 429;
+    proxy_pass http://school_api;
+}
+```
+
+Tune thresholds for expected traffic and configure trusted real-IP sources before relying on
+forwarded addresses.
 
 ---
 
@@ -1315,7 +1095,8 @@ gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000
 | Public updates | inquiry_code + email + parent_mobile verification |
 | File upload | Extension whitelist, size limit |
 
-**Recommended additions:** Rate limiting (login), HTTPS only, rotate JWT secret, WAF, forgot-password flow.
+**Recommended additions:** HTTPS-only ingress, JWT secret rotation, and a WAF. Public-form
+rate limiting is configured at ingress; password recovery is not implemented.
 
 ---
 
@@ -1334,40 +1115,65 @@ gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000
 
 ## 19. Future Enhancements
 
-- Career / HR hiring module (employee inquiry, interview, onboarding)
-- Academic sessions and sections as dedicated tables
-- Results and report cards
-- Student attendance
-- Notifications (email/SMS) with outbox pattern
-- Parent and student portals
-- Fee management
-- Redis caching and Celery workers
-- S3/Azure blob for documents
-- Forgot / reset password
-- API rate limiting and OAuth2 social login
+- **Not implemented:** Career/HR hiring, academic sessions/sections, student attendance,
+  results/report cards, fees, notifications, and parent/student portals.
+- **Operational improvements under consideration:** Redis caching, a background job system,
+  object storage, password recovery, API rate limiting inside the application, and social
+  login. Public endpoint rate limiting is currently an ingress responsibility.
+- **Unapproved proposal ideas:** Multi-school tenancy, report exports, calendar/timetable,
+  bus tracking, library, and online exams. These originated in design material and are not
+  committed product requirements.
 
 ---
 
-## 20. README Documentation
+## 20. Documentation Maintenance
 
-The repository `README.md` is the operational entry point for developers. It should remain consistent with this technical documentation:
+The root [README](../README.md) is the concise project overview and quick-start guide.
+This technical guide is the authoritative architecture, workflow, operations, and
+maintenance document. The [API reference](api-reference.md) and
+[database schema reference](database-schema-reference.md) are separate generated snapshots
+because they use different sources and change on different schedules.
 
-- **Quick Start**: venv, install, `alembic upgrade head`, run with `uvicorn app.main:app --reload`
-- **Initial admin**: configured via `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD`
-- **Logging**: daily files in `logs/` + cleanup script `python scripts/cleanup_logs.py`
-- **References**: link to `docs/TECHNICAL_DOCUMENTATION.md` and OpenAPI `/docs`
+### Reference generator behavior
 
-If a conflict exists, prefer codebase truth:
+| Generator | Input and output | What is automated | What remains manually curated |
+|-----------|------------------|-------------------|-------------------------------|
+| `scripts/generate_api_reference.py` | Imports the FastAPI app and writes `docs/api-reference.md`. | Reads OpenAPI paths, parameters, request schemas, field constraints, security declarations; inspects route handlers for declared permissions; builds illustrative request/success/error examples. | Response-model mappings, custom response payload mappings, sample values, and some success-model examples are explicit script metadata. Review these mappings when handler output changes. |
+| `scripts/generate_database_reference.py` | Connects to `DATABASE_URL` and writes `docs/database-schema-reference.md`. | Introspects the configured live database for tables, columns, types, nullability, defaults, primary/foreign keys, unique constraints, indexes, checks, current Alembic revision, and differences from registered ORM models. | Table/field descriptions and selected API-rule notes are maintained in the generator. The script does not infer undocumented business meaning or migration intent. |
 
-1. OpenAPI (`/docs`) for endpoint shapes
-2. `app/core/config.py` and `.env.example` for configuration
-3. Alembic migration files for DB schema evolution
+The generated Markdown files are checked into version control so reviewers and users can
+read the references without running the generators. Keep the scripts: they reduce drift and
+provide repeatable reference output, but they do not remove the need to review hand-curated
+metadata or confirm the target database.
+
+After route/schema changes, regenerate the API reference from the repository root:
+
+```powershell
+python scripts\generate_api_reference.py
+```
+
+After database migrations, confirm `.env` points to the intended database, then regenerate
+the live database snapshot:
+
+```powershell
+python scripts\generate_database_reference.py
+```
+
+The database generator performs schema inspection and reads the current Alembic revision;
+it does not migrate the database or read application records. Never run it against a
+production or customer database unless that target is explicitly intended for the
+documentation snapshot. Review generated diffs, verify examples/constraints, and commit
+the updated Markdown together with relevant source changes.
+
+For disagreements, use the runtime `/openapi.json` and source for API behavior, migration
+files for schema history, and database inspection for the live target schema. Generated
+examples are illustrative and are not captured business transactions.
 
 ---
 
 ## 21. Diagrams & Visual Documentation
 
-### 19.1 Request Lifecycle
+### 21.1 Request Lifecycle
 
 ```mermaid
 sequenceDiagram
@@ -1389,7 +1195,7 @@ sequenceDiagram
     M-->>C: Response + X-Request-ID
 ```
 
-### 19.2 Module Dependencies
+### 21.2 Module Dependencies
 
 ```mermaid
 flowchart LR
@@ -1421,8 +1227,11 @@ flowchart LR
 
 ### A. Related Documents
 
-- `SCHOOL_MANAGEMENT_BACKEND_BLUEPRINT.md` — Original API blueprint
-- `README.md` — Quick start
+- [README](../README.md) — Project overview and quick start
+- [API reference](api-reference.md) — Generated operation/schema catalog and examples
+- [Database schema reference](database-schema-reference.md) — Configured live schema snapshot
+- `scripts/generate_api_reference.py` and `scripts/generate_database_reference.py` —
+  Reference documentation generators; see Section 20
 - OpenAPI: `/docs` and `/redoc`
 
 ### B. Pagination Defaults
@@ -1438,6 +1247,26 @@ flowchart LR
 | Admission | ADM{YYYY}{5-digit} | ADM202600001 |
 | Student | STU{YYYY}{5-digit} | STU202600001 |
 | Roll number | Integer per class+year | 1, 2, 3… |
+
+---
+
+## 23. Verification Checklist
+
+Use this checklist for a deployment or release review. Environment-dependent checks must
+be repeated against the target environment; generated references are snapshots, not live
+monitoring.
+
+| Check | Status | What to verify |
+|---|---|---|
+| Documentation source of truth | Documented | Use source/OpenAPI/migrations for current behavior; proposal-era details are labeled as unapproved ideas or superseded history. |
+| API contract | Generated | Review all operations, fields, constraints, route permissions, and illustrative examples in [the API reference](api-reference.md); compare with the running `/openapi.json` after API changes. |
+| Database schema | Snapshot generated | Compare [the database reference](database-schema-reference.md) with the target database after migrations; resolve model/database differences before relying on ORM fields. |
+| Configuration and secrets | Environment-specific | Set required environment variables securely; use strong production secrets and never copy example credentials into deployment settings. |
+| Migrations and seeding | Environment-specific | Apply Alembic migrations as a release step. Run seeding only when intended; configure both initial-admin values to create the bootstrap administrator. |
+| Inquiry-to-enrollment flow | Source reviewed | Test duplicate inquiry handling, interview outcomes, all six document uploads and verifications, approval, active-class capacity, and resulting student/roll assignment. |
+| File upload controls | Documented limitation | Confirm configured extension/size limits and private storage behavior; malware scanning and MIME-signature verification are not implemented by the application. |
+| Authentication and authorization | Source documented | Verify login/token lifecycle and expected role/permission access using deployment-specific accounts. |
+| Tests and deployment smoke checks | Run per release | Execute CI tests, then verify health/readiness, database connectivity, API docs, and representative protected/public routes in the target environment. |
 
 ---
 
