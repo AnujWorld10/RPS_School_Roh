@@ -4,7 +4,7 @@ Authenticated staff APIs for managing student admission inquiries.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permissions
@@ -21,6 +21,15 @@ from app.schemas.inquiry_mappers import to_staff_inquiry_response
 from app.services.inquiries import InquiryService
 
 router = APIRouter()
+InquiryId = Annotated[
+    int,
+    Path(
+        description=(
+            "Numeric database ID of the inquiry. Use the `id` from GET /api/v1/inquiries; "
+            "this is not the human-readable inquiry_code."
+        )
+    ),
+]
 
 
 @router.get("")
@@ -62,7 +71,7 @@ def list_inquiries(
 
 @router.get("/{inquiry_id}")
 def get_inquiry(
-    inquiry_id: int,
+    inquiry_id: InquiryId,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_permissions("inquiries.read"))],
@@ -78,7 +87,7 @@ def get_inquiry(
 
 @router.put("/{inquiry_id}")
 def update_inquiry_admin(
-    inquiry_id: int,
+    inquiry_id: InquiryId,
     payload: AdminInquiryUpdateRequest,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
@@ -95,7 +104,7 @@ def update_inquiry_admin(
 
 @router.post("/{inquiry_id}/review/start")
 def start_inquiry_review(
-    inquiry_id: int,
+    inquiry_id: InquiryId,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("inquiries.review"))],
@@ -117,7 +126,7 @@ def start_inquiry_review(
 
 @router.post("/{inquiry_id}/review/process")
 def mark_inquiry_processing(
-    inquiry_id: int,
+    inquiry_id: InquiryId,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("inquiries.update"))],
@@ -139,7 +148,7 @@ def mark_inquiry_processing(
 
 @router.post("/{inquiry_id}/reject")
 def reject_inquiry(
-    inquiry_id: int,
+    inquiry_id: InquiryId,
     payload: InquiryRejectRequest,
     request: Request,
     db: Annotated[Session, Depends(get_db)],

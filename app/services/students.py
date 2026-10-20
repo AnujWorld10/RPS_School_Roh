@@ -11,6 +11,7 @@ from app.models.student import Student
 from app.models.user import User
 from app.repositories.classes import ClassRepository
 from app.repositories.students import StudentRepository
+from app.repositories.subjects import ClassSubjectRepository
 from app.schemas.students import (
     StudentClassAssignRequest,
     StudentCreateRequest,
@@ -38,6 +39,7 @@ class StudentService:
         self.session = session
         self.repo = StudentRepository(session)
         self.classes = ClassRepository(session)
+        self.class_subjects = ClassSubjectRepository(session)
         self.audit = AuditService(session)
 
     def create_student(
@@ -48,12 +50,14 @@ class StudentService:
     ) -> Student:
         if payload.admission_no and self.repo.admission_no_exists(payload.admission_no):
             raise ConflictException("Admission number already exists", field="admission_no")
-        if payload.current_class_id:
-            school_class = self.classes.get_active(payload.current_class_id)
-            if not school_class:
-                raise NotFoundException("Class not found")
-            self._ensure_capacity(school_class.id)
         with transaction(self.session):
+            school_class = None
+            if payload.current_class_id:
+                school_class = self.classes.get_active_for_update(payload.current_class_id)
+                if not school_class or school_class.status != ClassStatus.ACTIVE.value:
+                    raise NotFoundException("Class not found")
+                self._ensure_academic_readiness(school_class)
+                self._ensure_available_capacity(school_class.id, school_class.capacity)
             student = self.repo.create(
                 Student(
                     student_code=generate_student_code(self.session),
@@ -66,6 +70,7 @@ class StudentService:
                     phone=payload.phone,
                     class_id=payload.current_class_id,
                     current_class_id=payload.current_class_id,
+                    academic_year=school_class.academic_year if school_class else None,
                     status=StudentStatus.PROSPECTIVE.value
                     if not payload.current_class_id
                     else StudentStatus.ACTIVE.value,
@@ -119,13 +124,28 @@ class StudentService:
     ) -> Student:
         student = self.get_student(student_id)
         with transaction(self.session):
+            school_class = None
+            if payload.current_class_id is not None:
+                school_class = self.classes.get_active_for_update(payload.current_class_id)
+                if not school_class or school_class.status != ClassStatus.ACTIVE.value:
+                    raise NotFoundException("Class not found")
+                self._ensure_academic_readiness(school_class)
+                if (
+                    student.status == StudentStatus.ACTIVE.value
+                    and student.class_id != payload.current_class_id
+                ):
+                    self._ensure_available_capacity(
+                        school_class.id,
+                        school_class.capacity,
+                        exclude_student_id=student.id,
+                    )
+                student.class_id = school_class.id
+                student.current_class_id = school_class.id
+                student.academic_year = school_class.academic_year
             for field in ("first_name", "last_name", "date_of_birth", "gender", "email", "phone"):
                 value = getattr(payload, field)
                 if value is not None:
                     setattr(student, field, value)
-            if payload.current_class_id is not None:
-                self._ensure_capacity(payload.current_class_id)
-                student.current_class_id = payload.current_class_id
             student = self.repo.update(student)
             self.audit.log(
                 action="student.update",
@@ -175,23 +195,20 @@ class StudentService:
             school_class = self.classes.get_active_for_update(payload.class_id)
             if not school_class or school_class.status != ClassStatus.ACTIVE.value:
                 raise NotFoundException("Class not found")
+            self._ensure_academic_readiness(school_class)
             if school_class.academic_year != payload.academic_year:
                 raise BusinessRuleException(
                     "Academic year must match the selected class",
                 )
             if (
-                student.status == StudentStatus.ACTIVE.value
-                and (
-                    student.class_id != payload.class_id
-                    or student.academic_year != payload.academic_year
-                )
+                student.class_id != payload.class_id
+                or student.academic_year != payload.academic_year
             ):
-                enrolled = self.classes.count_active_students(
+                self._ensure_available_capacity(
                     payload.class_id,
+                    school_class.capacity,
                     exclude_student_id=student.id,
                 )
-                if enrolled >= school_class.capacity:
-                    raise BusinessRuleException("Class capacity exceeded")
 
             student.class_id = payload.class_id
             student.current_class_id = payload.class_id
@@ -224,10 +241,29 @@ class StudentService:
                 request=request,
             )
 
-    def _ensure_capacity(self, class_id: int) -> None:
-        school_class = self.classes.get_active(class_id)
-        if not school_class:
-            raise NotFoundException("Class not found")
-        enrolled = self.classes.count_active_students(class_id)
-        if enrolled >= school_class.capacity:
+    def _ensure_available_capacity(
+        self,
+        class_id: int,
+        capacity: int,
+        exclude_student_id: int | None = None,
+    ) -> None:
+        enrolled = self.classes.count_active_students(
+            class_id,
+            exclude_student_id=exclude_student_id,
+        )
+        if enrolled >= capacity:
             raise BusinessRuleException("Class capacity exceeded")
+
+    def _ensure_academic_readiness(self, school_class) -> None:
+        issues = self.classes.academic_readiness_issues(school_class)
+        if issues:
+            raise BusinessRuleException(
+                "Class is not ready for academic operations: " + " ".join(issues)
+            )
+
+    def list_student_subjects(self, student_id: int, current_user: User):
+        student = self.get_student_for_user(student_id, current_user)
+        class_id = student.class_id or student.current_class_id
+        if class_id is None:
+            raise BusinessRuleException("Student is not assigned to a class")
+        return self.class_subjects.list_for_class(class_id, active_only=True)

@@ -56,6 +56,9 @@ class ClassUpdateRequest(BaseModel):
 
 class ClassResponse(ORMModel):
     id: int = Field(..., description="Internal class ID.")
+    class_teacher_id: int | None = Field(
+        ..., description="Designated class-teacher ID, if academic setup is complete."
+    )
     name: str = Field(..., description="Class or grade name.")
     section: str | None = Field(..., description="Section identifier, if set.")
     academic_year: str = Field(..., description="Academic year.", examples=["2026-2027"])

@@ -78,6 +78,12 @@ class EnrollmentService:
             school_class = self.classes.get_active_for_update(admission.class_id)
             if not school_class or school_class.status != ClassStatus.ACTIVE.value:
                 raise BusinessRuleException("Target class is not active")
+            readiness = self.classes.academic_readiness_issues(school_class)
+            if readiness:
+                raise BusinessRuleException(
+                    "Target class is not ready for academic operations: "
+                    + " ".join(readiness)
+                )
 
             enrolled = self.classes.count_active_students(admission.class_id)
             if enrolled >= school_class.capacity:

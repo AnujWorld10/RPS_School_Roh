@@ -17,6 +17,7 @@ from app.schemas import (
     inquiries,
     interviews,
     students,
+    subjects,
     teachers,
 )
 
@@ -79,6 +80,7 @@ RESPONSE_MODULES = (
     inquiries,
     interviews,
     students,
+    subjects,
     teachers,
 )
 MODEL_REGISTRY = {
@@ -89,11 +91,78 @@ MODEL_REGISTRY = {
 }
 
 CUSTOM_RESPONSE_DATA = {
+    "activate_subject": (
+        {"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True},
+        False,
+    ),
     "assign_class": ({"class_id": 1}, False),
     "assign_subject": ({"subject_id": 1}, False),
+    "assign_class_subject": ({"class_id": 1, "subject_id": 1}, False),
+    "assign_class_teacher": ({"class_id": 1, "teacher_id": 1}, False),
+    "assign_teacher_class_subject": (
+        {"teacher_id": 1, "class_id": 1, "subject_id": 1},
+        False,
+    ),
     "change_password": (None, False),
     "delete_class": (None, False),
     "delete_student": (None, False),
+    "deactivate_subject": (
+        {"id": 1, "code": "MATH", "name": "Mathematics", "is_active": False},
+        False,
+    ),
+    "get_class_academic_readiness": (
+        {
+            "class_id": 1,
+            "ready": True,
+            "class_teacher_id": 1,
+            "active_subject_ids": [1],
+            "issues": [],
+        },
+        False,
+    ),
+    "get_subject": (
+        {"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True},
+        False,
+    ),
+    "get_teacher_academic_readiness": (
+        {
+            "teacher_id": 1,
+            "ready": True,
+            "assignments": [
+                {
+                    "class_id": 1,
+                    "subject_id": 1,
+                    "class_name": "Grade 5",
+                    "subject_name": "Mathematics",
+                }
+            ],
+            "issues": [],
+        },
+        False,
+    ),
+    "list_class_subjects": (
+        [{"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True}],
+        False,
+    ),
+    "list_student_subjects": (
+        [{"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True}],
+        False,
+    ),
+    "list_subjects": (
+        [{"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True}],
+        True,
+    ),
+    "list_teacher_class_subjects": (
+        [
+            {
+                "class_id": 1,
+                "subject_id": 1,
+                "class_name": "Grade 5",
+                "subject_name": "Mathematics",
+            }
+        ],
+        False,
+    ),
     "list_required_documents": (
         {
             "required": [
@@ -116,6 +185,18 @@ CUSTOM_RESPONSE_DATA = {
         False,
     ),
     "logout_user": (None, False),
+    "remove_class_subject": (None, False),
+    "remove_class_teacher": (None, False),
+    "remove_teacher_class_subject": (None, False),
+    "replace_class_teacher": ({"class_id": 1, "teacher_id": 1}, False),
+    "create_subject": (
+        {"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True},
+        False,
+    ),
+    "update_subject": (
+        {"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True},
+        False,
+    ),
     "submit_student_inquiry": (
         {"inquiry_code": "INQ202600007", "status": "PENDING"},
         False,
@@ -220,6 +301,10 @@ MODEL_FIELD_EXAMPLES = {
     },
 }
 
+HANDLER_FIELD_EXAMPLES = {
+    "start_inquiry_review": {"status": "UNDER_REVIEW"},
+}
+
 
 def markdown_text(value: Any) -> str:
     """Escape text for safe use in a Markdown table cell."""
@@ -273,7 +358,7 @@ def first_example(value: Any) -> Any:
     return value
 
 
-def operation_schema(schema: dict[str, Any]) -> str:
+def operation_schema(schema: dict[str, Any], include_description: bool = True) -> str:
     if not schema:
         return "—"
     description = schema.get("description")
@@ -283,7 +368,7 @@ def operation_schema(schema: dict[str, Any]) -> str:
     example = first_example(schema.get("example", schema.get("examples")))
     if example is not None:
         details.append(f"Example: `{markdown_text(example)}`")
-    if description:
+    if description and include_description:
         details.append(markdown_text(description))
     return "; ".join(details)
 
@@ -421,6 +506,7 @@ def response_example(
         definitions = model_schema.pop("$defs", {})
         data = sample_value(model_schema, components, definitions=definitions)
         data.update(MODEL_FIELD_EXAMPLES.get(model_name, {}))
+        data.update(HANDLER_FIELD_EXAMPLES.get(handler, {}))
         if paginated:
             data = [data]
     elif custom_data:
@@ -494,15 +580,22 @@ def render_parameter(parameter: dict[str, Any]) -> str:
     parameter_examples = parameter.get("example", parameter.get("examples"))
     schema_examples = schema.get("example", schema.get("examples"))
     example = first_example(parameter_examples or schema_examples)
-    details = operation_schema(schema)
+    details = operation_schema(schema, include_description=False)
     if example is not None and "Example:" not in details:
         details += f"; Example: `{markdown_text(example)}`"
+    descriptions = {
+        "class_id": "Numeric database ID of the class.",
+        "subject_id": "Numeric database ID of the subject.",
+        "teacher_id": "Numeric database ID of the teacher.",
+        "student_id": "Numeric database ID of the student.",
+    }
+    description = parameter.get("description") or descriptions.get(parameter["name"], "—")
     return (
         f"| `{markdown_text(parameter['name'])}` "
         f"| {markdown_text(parameter.get('in', ''))} "
         f"| {'Yes' if parameter.get('required') else 'No'} "
         f"| {details} "
-        f"| {markdown_text(parameter.get('description', '—'))} |"
+        f"| {markdown_text(description)} |"
     )
 
 

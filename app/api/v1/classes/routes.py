@@ -10,6 +10,11 @@ from app.db.session import get_db
 from app.models.enums import ClassStatus
 from app.models.user import User
 from app.schemas.classes import ClassCreateRequest, ClassResponse, ClassUpdateRequest
+from app.schemas.subjects import (
+    ClassSubjectAssignRequest,
+    ClassTeacherAssignRequest,
+    SubjectResponse,
+)
 from app.services.classes import ClassService
 
 router = APIRouter()
@@ -71,6 +76,116 @@ def get_class(
         ClassResponse.model_validate(school_class).model_dump(),
         request,
     )
+
+
+@router.get("/{class_id}/readiness")
+def get_class_academic_readiness(
+    class_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(require_permissions("classes.read"))],
+):
+    readiness = ClassService(db).academic_readiness(class_id)
+    return success_response("Class academic readiness fetched successfully", readiness, request)
+
+
+@router.get("/{class_id}/subjects")
+def list_class_subjects(
+    class_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(require_permissions("classes.read"))],
+):
+    subjects = ClassService(db).list_subjects(class_id)
+    data = [SubjectResponse.model_validate(subject).model_dump() for subject in subjects]
+    return success_response("Class subjects fetched successfully", data, request)
+
+
+@router.post("/{class_id}/subjects", status_code=status.HTTP_201_CREATED)
+def assign_class_subject(
+    class_id: int,
+    payload: ClassSubjectAssignRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("classes.update"))],
+):
+    ClassService(db).assign_subject(
+        class_id,
+        payload.subject_id,
+        current_user.id,
+        request,
+    )
+    return success_response(
+        "Subject assigned to class successfully",
+        {"class_id": class_id, "subject_id": payload.subject_id},
+        request,
+    )
+
+
+@router.delete("/{class_id}/subjects/{subject_id}")
+def remove_class_subject(
+    class_id: int,
+    subject_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("classes.update"))],
+):
+    ClassService(db).remove_subject(class_id, subject_id, current_user.id, request)
+    return success_response("Subject removed from class successfully", None, request)
+
+
+@router.post("/{class_id}/class-teacher", status_code=status.HTTP_201_CREATED)
+def assign_class_teacher(
+    class_id: int,
+    payload: ClassTeacherAssignRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("classes.update"))],
+):
+    ClassService(db).assign_class_teacher(
+        class_id,
+        payload.teacher_id,
+        current_user.id,
+        request,
+    )
+    return success_response(
+        "Class teacher assigned successfully",
+        {"class_id": class_id, "teacher_id": payload.teacher_id},
+        request,
+    )
+
+
+@router.put("/{class_id}/class-teacher")
+def replace_class_teacher(
+    class_id: int,
+    payload: ClassTeacherAssignRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("classes.update"))],
+):
+    ClassService(db).assign_class_teacher(
+        class_id,
+        payload.teacher_id,
+        current_user.id,
+        request,
+        replace=True,
+    )
+    return success_response(
+        "Class teacher updated successfully",
+        {"class_id": class_id, "teacher_id": payload.teacher_id},
+        request,
+    )
+
+
+@router.delete("/{class_id}/class-teacher")
+def remove_class_teacher(
+    class_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("classes.update"))],
+):
+    ClassService(db).remove_class_teacher(class_id, current_user.id, request)
+    return success_response("Class teacher removed successfully", None, request)
 
 
 @router.put("/{class_id}")

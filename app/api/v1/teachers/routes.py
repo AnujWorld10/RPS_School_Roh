@@ -9,6 +9,7 @@ from app.core.responses import paginated_response, success_response
 from app.db.session import get_db
 from app.models.enums import TeacherStatus
 from app.models.user import User
+from app.schemas.subjects import TeacherClassSubjectAssignRequest
 from app.schemas.teachers import (
     AttendanceCreateRequest,
     AttendanceResponse,
@@ -107,6 +108,10 @@ def assign_subject(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("teachers.update"))],
 ):
+    """Compatibility assignment for a global teacher/subject link.
+
+    Use the class-subjects endpoint for class-specific teaching allocations.
+    """
     TeacherService(db).assign_subject(teacher_id, payload, current_user.id, request)
     return success_response(
         "Subject assigned successfully",
@@ -125,6 +130,81 @@ def list_teacher_subjects(
     subjects = TeacherService(db).list_subjects(teacher_id)
     data = [{"id": s.id, "code": s.code, "name": s.name} for s in subjects]
     return success_response("Subjects fetched successfully", data, request)
+
+
+@router.get("/{teacher_id}/class-subjects")
+def list_teacher_class_subjects(
+    teacher_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(require_permissions("teachers.read"))],
+):
+    assignments = TeacherService(db).list_class_subjects(teacher_id)
+    data = [
+        {
+            "class_id": class_id,
+            "subject_id": subject_id,
+            "class_name": class_name,
+            "subject_name": subject_name,
+        }
+        for class_id, subject_id, class_name, subject_name in assignments
+    ]
+    return success_response("Teacher class-subject assignments fetched successfully", data, request)
+
+
+@router.get("/{teacher_id}/academic-readiness")
+def get_teacher_academic_readiness(
+    teacher_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(require_permissions("teachers.read"))],
+):
+    data = TeacherService(db).academic_readiness(teacher_id)
+    return success_response("Teacher academic readiness fetched successfully", data, request)
+
+
+@router.post("/{teacher_id}/class-subjects", status_code=status.HTTP_201_CREATED)
+def assign_teacher_class_subject(
+    teacher_id: int,
+    payload: TeacherClassSubjectAssignRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("teachers.update"))],
+):
+    TeacherService(db).assign_class_subject(
+        teacher_id,
+        payload,
+        current_user.id,
+        request,
+    )
+    return success_response(
+        "Teacher assigned to class subject successfully",
+        {
+            "teacher_id": teacher_id,
+            "class_id": payload.class_id,
+            "subject_id": payload.subject_id,
+        },
+        request,
+    )
+
+
+@router.delete("/{teacher_id}/class-subjects/{class_id}/{subject_id}")
+def remove_teacher_class_subject(
+    teacher_id: int,
+    class_id: int,
+    subject_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("teachers.update"))],
+):
+    TeacherService(db).remove_class_subject(
+        teacher_id,
+        class_id,
+        subject_id,
+        current_user.id,
+        request,
+    )
+    return success_response("Teacher class-subject assignment removed successfully", None, request)
 
 
 @router.post("/{teacher_id}/class", status_code=status.HTTP_201_CREATED)

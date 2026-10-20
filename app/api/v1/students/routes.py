@@ -15,9 +15,22 @@ from app.schemas.students import (
     StudentResponse,
     StudentUpdateRequest,
 )
+from app.schemas.subjects import SubjectResponse
 from app.services.students import StudentService
 
 router = APIRouter()
+
+
+@router.get("/{student_id}/subjects")
+def list_student_subjects(
+    student_id: int,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_permissions("students.read"))],
+):
+    subjects = StudentService(db).list_student_subjects(student_id, current_user)
+    data = [SubjectResponse.model_validate(subject).model_dump() for subject in subjects]
+    return success_response("Student class subjects fetched successfully", data, request)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
