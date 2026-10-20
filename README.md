@@ -51,7 +51,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 alembic upgrade head
-python scripts\seed_db.py
+python -m scripts.seed_db
 ```
 
 If PowerShell blocks environment activation for this session, run:
@@ -112,8 +112,15 @@ for deployment details and local-MySQL container scenarios.
   `DATABASE_URL` uses the correct username, password, host, port, and database name.
 - **Unknown column or missing table:** Apply migrations to the same database configured in
   `.env` with `alembic upgrade head`; the API does not migrate automatically.
-- **No administrator can log in:** Run `python scripts\seed_db.py` and configure both
+- **Alembic reports a revision but application tables are missing:** Confirm the API and
+  Alembic use the intended database. Only for a disposable database with no application
+  tables, remove its stale `alembic_version` table and rerun `alembic upgrade head`. Do not
+  reset the marker on a database containing data; see the
+  [migration recovery notes](docs/technical-documentation.md#alembic-revision-and-schema-mismatch).
+- **No administrator can log in:** Run `python -m scripts.seed_db` and configure both
   initial-admin values before seeding.
+- **Seed command fails with `No module named 'app'`:** Run it from the repository root as
+  `python -m scripts.seed_db`, not as `python scripts\seed_db.py`.
 - **Import errors or incompatible Python:** Use Python 3.12+, activate the project virtual
   environment, and install `pip install -e ".[dev]"` from the repository root.
 

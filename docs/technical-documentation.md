@@ -222,7 +222,7 @@ Copy `.env.example` to `.env` and update the settings for your machine:
 
 ```powershell
 alembic upgrade head
-python scripts/seed_db.py
+python -m scripts.seed_db
 ```
 
 Seeding is now manual by default. The `SEED_ON_STARTUP` environment variable controls whether the application seeds at startup, and it defaults to `false`.
@@ -484,6 +484,42 @@ python scripts/cleanup_logs.py
 - **Do not delete old Alembic revisions** in `alembic/versions/`. Alembic needs them to resolve the revision graph.
 - The database stores the active revision in `alembic_version.version_num` and Alembic must be able to locate that revision file.
 - For major schema refactors, prefer a planned **baseline/squash** approach (new base revision + controlled DB rebuild) rather than ad-hoc deletion.
+
+#### Alembic Revision and Schema Mismatch
+
+Alembic uses `alembic_version` to decide which migrations to apply; it does not verify that
+all tables from earlier revisions still exist before moving to the next revision. If
+`alembic upgrade head` fails because a table is missing, first confirm that the command and
+the API target the same database. Inspect the current revision and MySQL schema:
+
+```powershell
+alembic current
+```
+
+```sql
+SELECT DATABASE();
+SELECT version_num FROM alembic_version;
+SHOW TABLES;
+```
+
+If the database is explicitly disposable and `SHOW TABLES` lists only `alembic_version`,
+remove that stale marker in the confirmed target database, then rebuild and seed from the
+repository root:
+
+```sql
+DROP TABLE alembic_version;
+```
+
+```powershell
+alembic upgrade head
+python -m scripts.seed_db
+```
+
+This reset is destructive to migration history and is only appropriate when there is no
+application data or schema to preserve. Do not drop or stamp the version table on a database
+with application tables or data; take a backup and have the schema and migration state
+reconciled deliberately instead. MySQL DDL may not roll back when a migration fails, so
+inspect the tables again before retrying after a partially applied migration.
 
 ### 6.2 Entity Relationship Diagram
 
