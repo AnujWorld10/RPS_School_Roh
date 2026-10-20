@@ -6,13 +6,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-os.environ.setdefault("APP_ENV", "test")
-# Tests use in-memory SQLite so pytest does not require a separate MySQL database.
-os.environ.setdefault("DATABASE_URL", "sqlite://")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-32chars-min")
-os.environ.setdefault("DEBUG", "true")
-os.environ.setdefault("INITIAL_ADMIN_EMAIL", "test-admin@school.com")
-os.environ.setdefault("INITIAL_ADMIN_PASSWORD", "TestAdmin@123")
+os.environ["APP_ENV"] = "test"
+# Keep test database and bootstrap credentials independent of local environment settings.
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-32chars-min"
+os.environ["DEBUG"] = "true"
+os.environ["INITIAL_ADMIN_EMAIL"] = "test-admin@school.com"
+os.environ["INITIAL_ADMIN_PASSWORD"] = "TestAdmin@123"
 
 from app.core.config import get_settings
 from app.db.base import Base

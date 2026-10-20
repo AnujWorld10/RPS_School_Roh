@@ -14,7 +14,7 @@ from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.user import User
 from app.schemas.classes import ClassCreateRequest
-from app.schemas.students import StudentClassAssignRequest
+from app.schemas.students import StudentClassAssignRequest, StudentUpdateRequest
 from app.schemas.subjects import (
     SubjectCreateRequest,
     TeacherClassSubjectAssignRequest,
@@ -259,6 +259,45 @@ def test_students_require_ready_class_and_inherit_its_active_subjects(db_session
     assert [
         item.id for item in student_service.list_student_subjects(student.id, admin_user)
     ] == [subject.id]
+
+
+def test_student_update_can_assign_ready_class_and_update_profile(db_session):
+    school_class = _create_class(db_session)
+    teacher = _create_teacher(db_session)
+    subject = _create_subject(db_session)
+    classes = ClassService(db_session)
+    classes.assign_class_teacher(school_class.id, teacher.id, 1, _request())
+    classes.assign_subject(school_class.id, subject.id, 1, _request())
+    student = Student(
+        student_code="STU-SUBJECT-UPDATE",
+        first_name="Before",
+        last_name="Update",
+        date_of_birth=date(2015, 5, 14),
+        gender="female",
+        status=StudentStatus.PROSPECTIVE.value,
+    )
+    db_session.add(student)
+    db_session.commit()
+    service = StudentService(db_session)
+
+    profile_updated = service.update_student(
+        student.id,
+        StudentUpdateRequest(first_name="After"),
+        1,
+        _request(),
+    )
+    assert profile_updated.first_name == "After"
+    assert profile_updated.class_id is None
+
+    class_updated = service.update_student(
+        student.id,
+        StudentUpdateRequest(current_class_id=school_class.id),
+        1,
+        _request(),
+    )
+    assert class_updated.class_id == school_class.id
+    assert class_updated.current_class_id == school_class.id
+    assert class_updated.academic_year == school_class.academic_year
 
 
 def test_active_student_prevents_removing_class_subject(db_session):
