@@ -414,7 +414,7 @@ def test_enrollment_revalidates_documents_inside_transaction(db_session):
     db_session.add(school_class)
     db_session.flush()
     admission = InquiryAdmission(
-        admission_code="ADM-PHASE2-MISSING-DOCS",
+        admission_code="ADM-P2-MISSING-DOCS",
         inquiry_id=inquiry.id,
         class_id=school_class.id,
         academic_year=school_class.academic_year,
