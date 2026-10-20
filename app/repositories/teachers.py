@@ -54,6 +54,9 @@ class TeacherAssignmentRepository:
         self.session.flush()
         return entity
 
+    def get_subject(self, subject_id: int) -> Subject | None:
+        return self.session.get(Subject, subject_id)
+
     def assign_class(self, teacher_id: int, class_id: int) -> TeacherClass:
         entity = TeacherClass(teacher_id=teacher_id, class_id=class_id)
         self.session.add(entity)

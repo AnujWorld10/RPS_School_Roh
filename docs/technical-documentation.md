@@ -73,7 +73,7 @@ The system is designed for:
 | Enrollment | Generate `student_code`, `roll_number`, assign class |
 | RBAC | Role + permission based API protection |
 | Audit | Log state-changing operations |
-| Operations | Classes, students, teachers (profile, attendance, salary) |
+| Operations | Classes, subjects, students, teachers (profile, attendance, salary) |
 
 **Planned (not yet implemented):** Career/HR hiring module, results, academic sessions as first-class entities, notifications, fee management.
 
@@ -86,9 +86,10 @@ The system is designed for:
 | **Inquiries** | Staff review, status transitions, rejection |
 | **Interviews** | Schedule, list, record results |
 | **Admissions** | Inquiry-linked admission, documents, approve, enroll |
-| **Classes** | CRUD, capacity, soft delete |
+| **Classes** | CRUD, capacity, class teacher, subject offerings, readiness, soft delete |
+| **Subjects** | Subject catalog CRUD, search, activation/deactivation |
 | **Students** | CRUD, status, class assignment, soft delete |
-| **Teachers** | Profile, subject/class assignment, attendance, salary payments |
+| **Teachers** | Profile, legacy subject/class links, class-scoped subject teaching, attendance, salary payments |
 | **Core** | Config, security, logging, middleware, responses, exceptions |
 
 ### 1.4 Architecture Overview
@@ -476,6 +477,7 @@ python scripts/cleanup_logs.py
 | `007_refresh_tokens` | `007_align_refresh_tokens.py` | Align `refresh_tokens` (`token_hash`, `updated_at`) and remove raw token storage |
 | `008_duplicate_key` | `008_inquiry_duplicate_key.py` | Add nullable inquiry identity hash and unique duplicate guard |
 | `009_reconcile_orm` | `009_reconcile_orm_schema.py` | Reconcile legacy schema with current ORM and add operational tables/constraints |
+| `010_subject_academic_map` | `010_subject_class_academic_mappings.py` | Add designated class teachers, class subject offerings, class-scoped teacher teaching assignments, and subject-management permissions |
 
 #### Migration Safety Notes (Important)
 
@@ -504,12 +506,17 @@ erDiagram
     inquiry_admissions }o--|| classes : for
     inquiry_admissions }o--o| students : enrolls
 
-    classes ||--o{ students : contains
+    classes ||--o{ students : enrolled_students_inherit_offerings
     students ||--o{ student_admissions : legacy
 
-    teachers ||--o{ teacher_subjects : teaches
-    subjects ||--o{ teacher_subjects : taught
+    teachers ||--o{ teacher_subjects : legacy_subject_link
+    subjects ||--o{ teacher_subjects : legacy_subject_link
     teachers ||--o{ teacher_classes : assigned
+    teachers ||--o| classes : designated_class_teacher
+    classes ||--o{ class_subjects : offers
+    subjects ||--o{ class_subjects : offered_to
+    teachers ||--o{ teacher_class_subjects : teaches
+    class_subjects ||--o{ teacher_class_subjects : staffed_by
     teachers ||--o| teacher_salary : has
     teachers ||--o{ teacher_attendance : has
     teachers ||--o{ teacher_salary_payments : receives
@@ -532,6 +539,11 @@ The script inspects schema metadata and the applied Alembic revision; it does no
 the database or read application records. The source migrations under `alembic/versions/`
 remain the authority for schema history, and the database snapshot is the authority for the
 currently configured database.
+
+Migration `010_subject_class_academic_mappings` is additive and preserves existing
+`teacher_subjects` rows as legacy global teacher/subject associations. Apply migrations to
+the intended database before regenerating the live schema snapshot; until then, its listed
+revision and table set intentionally describe the database as it currently exists.
 
 Revision `009_reconcile_orm_schema` adds operational teacher/student tables and constraints
 while retaining some legacy columns. Before upgrading a real database, take a backup and
@@ -696,8 +708,9 @@ stateDiagram-v2
   All six must be uploaded and verified before the admission can be approved. Replacing a
   document resets its verification and may return the workflow to document pending.
 - Enrollment requires an approved admission, all six documents verified, an active target
-  class, and available class capacity. Enrollment creates the student and class/year roll
-  number, links the student to the admission, and moves the inquiry to `ADMISSION_SUCCESS`.
+  class that is academically ready, and available class capacity. Enrollment creates the
+  student and class/year roll number, links the student to the admission, and moves the
+  inquiry to `ADMISSION_SUCCESS`.
 - `INTERVIEW_FAIL`, `REJECTED`, and `ADMISSION_SUCCESS` are locked states for edits to the
   original inquiry. Reapplication, when allowed by the duplicate-key rule above, is a new
   inquiry rather than an edit to that locked record.
@@ -706,6 +719,53 @@ The duplicate behavior is covered by unit tests for exact and case-insensitive m
 different names/DOB, reapplication after rejection/interview failure, and the service
 conflict path. A duplicate submission returns HTTP 409 with the standard error envelope;
 see the shared runtime error examples in the API reference.
+
+### 9.6 Class, subject, teacher, and student academic mapping
+
+Class setup remains intentionally incremental: creating an active class does not require
+its class teacher or subject catalog to exist yet. `GET /api/v1/classes/{class_id}/readiness`
+reports whether the class is ready: it must be active, have one active designated class
+teacher, and have at least one active subject offering. Setting an inactive class active is
+rejected until those requirements are met. Student class assignment and admission enrollment
+are also blocked while the selected class is not ready.
+
+The designated class teacher is stored on `classes.class_teacher_id`, separate from the
+teacher-to-class and teacher-to-subject teaching assignments. A teacher may be the designated
+class teacher for at most one non-deleted class. The teacher can still teach multiple
+class/subject combinations through `teacher_class_subjects`.
+`GET /api/v1/teachers/{teacher_id}/academic-readiness` reports whether an active teacher has
+at least one active class/subject teaching assignment; teacher creation remains available
+during setup so administrators can complete mappings afterward.
+
+`class_subjects` records curriculum offerings. A teacher's class-scoped assignment is accepted
+only when the class already offers that active subject; the composite foreign key and primary
+key prevent assignments to a non-offered subject and duplicate teacher/class/subject rows.
+The existing `teacher_subjects` table and `POST /api/v1/teachers/{teacher_id}/subject` endpoint
+remain for compatibility with older global teacher/subject links. They do not replace the
+new class-scoped teaching assignment and should not be used to determine a class timetable.
+
+Students inherit the active subjects offered to their enrolled class through `class_id`;
+`GET /api/v1/students/{student_id}/subjects` returns those offerings. The current project has
+no elective-selection workflow, so student-specific subject choices are not stored separately.
+Removing a class offering is blocked while active students are enrolled, and a subject cannot
+be deactivated while it is offered to an active class. Readiness is computed from current
+relationships rather than stored as a boolean, avoiding stale readiness flags.
+
+Setup sequence:
+
+1. Create subjects with `POST /api/v1/subjects`.
+2. Create the class; incomplete initial setup is allowed.
+3. Assign its designated teacher with `POST /api/v1/classes/{class_id}/class-teacher`.
+4. Offer subjects with `POST /api/v1/classes/{class_id}/subjects`.
+5. Assign teaching responsibility with `POST /api/v1/teachers/{teacher_id}/class-subjects`.
+6. Confirm class readiness before enrolling or assigning active students.
+
+Creating subjects requires `subjects.create`; listing and retrieving them requires
+`subjects.read`. Code/name updates and reactivation require `subjects.update`, while soft
+deactivation requires `subjects.delete`. Class curriculum and class-teacher assignments use
+`classes.update`; teacher teaching assignments use `teachers.update`. Migration 010 grants
+the new subject permissions to existing `ADMIN` and `SUPER_ADMIN` roles; the normal seed
+routine also includes them for fresh installations.
 
 ---
 

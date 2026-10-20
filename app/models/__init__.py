@@ -9,7 +9,7 @@ from app.models.refresh_token import RefreshToken
 from app.models.role import Role, UserRole
 from app.models.student import Student
 from app.models.student_inquiry import InquiryStatusHistory, StudentInquiry
-from app.models.subject import Subject, TeacherSubject
+from app.models.subject import ClassSubject, Subject, TeacherClassSubject, TeacherSubject
 from app.models.teacher import (
     Teacher,
     TeacherAttendance,
@@ -35,7 +35,9 @@ __all__ = [
     "InterviewSchedule",
     "Teacher",
     "Subject",
+    "ClassSubject",
     "TeacherSubject",
+    "TeacherClassSubject",
     "TeacherClass",
     "TeacherAttendance",
     "TeacherSalary",

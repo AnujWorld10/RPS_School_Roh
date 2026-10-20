@@ -49,6 +49,14 @@ class Teacher(Base, TimestampMixin):
     salary: Mapped["TeacherSalary | None"] = relationship(back_populates="teacher", uselist=False)
     attendances: Mapped[list["TeacherAttendance"]] = relationship(back_populates="teacher")
     salary_payments: Mapped[list["TeacherSalaryPayment"]] = relationship(back_populates="teacher")
+    homeroom_class: Mapped["Class | None"] = relationship(  # noqa: F821
+        back_populates="class_teacher",
+        uselist=False,
+    )
+    class_subject_assignments: Mapped[list["TeacherClassSubject"]] = relationship(  # noqa: F821
+        back_populates="teacher",
+        cascade="all, delete-orphan",
+    )
 
 
 class TeacherClass(Base):

@@ -7,7 +7,7 @@ from fastapi import UploadFile
 from sqlalchemy import inspect as sqlalchemy_inspect
 from sqlalchemy.exc import IntegrityError
 
-from app.core.exceptions import BusinessRuleException, ConflictException
+from app.core.exceptions import BusinessRuleException, ConflictException, NotFoundException
 from app.core.pagination import PaginationParams
 from app.core.security import hash_password
 from app.models.admission import AdmissionDocument, InquiryAdmission
@@ -21,12 +21,15 @@ from app.models.enums import (
     InterviewResult,
     InterviewResultUpdate,
     StudentStatus,
+    TeacherStatus,
     UserStatus,
 )
 from app.models.interview import InterviewSchedule
 from app.models.role import Role
 from app.models.student import Student
 from app.models.student_inquiry import StudentInquiry
+from app.models.subject import Subject
+from app.models.teacher import Teacher
 from app.models.user import User
 from app.repositories.inquiries import StudentInquiryRepository
 from app.repositories.inquiry_admissions import InquiryAdmissionRepository
@@ -35,12 +38,14 @@ from app.schemas.classes import ClassUpdateRequest
 from app.schemas.inquiries import PublicInquiryCreateRequest
 from app.schemas.interviews import InterviewResultUpdateRequest
 from app.schemas.students import StudentClassAssignRequest
+from app.schemas.teachers import SubjectAssignRequest
 from app.services.classes import ClassService
 from app.services.enrollment import EnrollmentService
 from app.services.inquiries import InquiryService
 from app.services.inquiry_admissions import InquiryAdmissionService
 from app.services.interviews import InterviewService
 from app.services.students import StudentService
+from app.services.teachers import TeacherService
 from app.utils.inquiry_ids import generate_inquiry_identifiers, inquiry_identity_key
 
 
@@ -450,6 +455,19 @@ def test_student_class_assignment_updates_authoritative_and_legacy_fields(db_ses
     )
     db_session.add(student)
     db_session.commit()
+    teacher = Teacher(
+        employee_no="PHASE2-CLASS-TEACHER",
+        first_name="Class",
+        last_name="Teacher",
+        email="phase2-class-teacher@example.test",
+        status=TeacherStatus.ACTIVE.value,
+    )
+    subject = Subject(code="PHASE2-CLASS-SUBJECT", name="Class Subject")
+    db_session.add_all([teacher, subject])
+    db_session.commit()
+    class_service = ClassService(db_session)
+    class_service.assign_class_teacher(school_class.id, teacher.id, 1, _request())
+    class_service.assign_subject(school_class.id, subject.id, 1, _request())
 
     updated = StudentService(db_session).assign_class(
         student.id,
@@ -465,3 +483,23 @@ def test_student_class_assignment_updates_authoritative_and_legacy_fields(db_ses
     assert updated.current_class_id == school_class.id
     assert updated.academic_year == school_class.academic_year
     assert updated.status == StudentStatus.ACTIVE.value
+
+
+def test_assigning_nonexistent_subject_returns_not_found(db_session):
+    teacher = Teacher(
+        employee_no="PHASE2-SUBJECT",
+        first_name="Subject",
+        last_name="Assignment",
+        email="subject-assignment@example.test",
+        status=TeacherStatus.ACTIVE.value,
+    )
+    db_session.add(teacher)
+    db_session.flush()
+
+    with pytest.raises(NotFoundException, match="subject not found"):
+        TeacherService(db_session).assign_subject(
+            teacher.id,
+            SubjectAssignRequest(subject_id=99999),
+            1,
+            _request(),
+        )

@@ -1,13 +1,20 @@
 from datetime import UTC, datetime
 
 from fastapi import Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessRuleException, ConflictException, NotFoundException
 from app.core.pagination import PaginatedResult, PaginationParams
 from app.core.transactions import transaction
 from app.models.enums import TeacherStatus
-from app.models.teacher import Teacher, TeacherAttendance, TeacherSalaryPayment
+from app.models.teacher import Teacher, TeacherAttendance, TeacherClass, TeacherSalaryPayment
+from app.repositories.classes import ClassRepository
+from app.repositories.subjects import (
+    ClassSubjectRepository,
+    TeacherClassSubjectRepository,
+    active_teacher_exists,
+)
 from app.repositories.teachers import (
     TeacherAssignmentRepository,
     TeacherAttendanceRepository,
@@ -15,6 +22,7 @@ from app.repositories.teachers import (
     TeacherSalaryPaymentRepository,
     TeacherSalaryRepository,
 )
+from app.schemas.subjects import TeacherClassSubjectAssignRequest
 from app.schemas.teachers import (
     AttendanceCreateRequest,
     ClassAssignRequest,
@@ -30,7 +38,10 @@ class TeacherService:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.repo = TeacherRepository(session)
+        self.classes = ClassRepository(session)
         self.assignments = TeacherAssignmentRepository(session)
+        self.class_subjects = ClassSubjectRepository(session)
+        self.teacher_class_subjects = TeacherClassSubjectRepository(session)
         self.attendance_repo = TeacherAttendanceRepository(session)
         self.salary_repo = TeacherSalaryRepository(session)
         self.payment_repo = TeacherSalaryPaymentRepository(session)
@@ -120,6 +131,9 @@ class TeacherService:
         request: Request,
     ):
         self.get_teacher(teacher_id)
+        subject = self.assignments.get_subject(payload.subject_id)
+        if not subject or not subject.is_active:
+            raise NotFoundException("Active subject not found; provide an existing subject ID")
         if self.assignments.subject_exists(teacher_id, payload.subject_id):
             raise ConflictException("Subject already assigned to teacher")
         with transaction(self.session):
@@ -137,6 +151,102 @@ class TeacherService:
     def list_subjects(self, teacher_id: int):
         self.get_teacher(teacher_id)
         return self.assignments.list_subjects(teacher_id)
+
+    def assign_class_subject(
+        self,
+        teacher_id: int,
+        payload: TeacherClassSubjectAssignRequest,
+        actor_id: int,
+        request: Request,
+    ) -> None:
+        try:
+            with transaction(self.session):
+                school_class = self.classes.get_active_for_update(payload.class_id)
+                if not school_class:
+                    raise NotFoundException("Class not found")
+                if not active_teacher_exists(self.session, teacher_id):
+                    raise NotFoundException("Active teacher not found")
+                if not self.class_subjects.has_active_offering(
+                    payload.class_id,
+                    payload.subject_id,
+                ):
+                    raise BusinessRuleException(
+                        "An active subject offering for the selected class is required"
+                    )
+                if self.teacher_class_subjects.has_assignment(
+                    teacher_id,
+                    payload.class_id,
+                    payload.subject_id,
+                ):
+                    raise ConflictException("Teacher is already assigned to this class subject")
+                self.teacher_class_subjects.add(
+                    teacher_id,
+                    payload.class_id,
+                    payload.subject_id,
+                )
+                if self.session.get(TeacherClass, (teacher_id, payload.class_id)) is None:
+                    self.session.add(TeacherClass(teacher_id=teacher_id, class_id=payload.class_id))
+                self.audit.log(
+                    action="teacher.class_subject.assign",
+                    entity_type="teacher",
+                    entity_id=teacher_id,
+                    actor_user_id=actor_id,
+                    new_values={
+                        "class_id": payload.class_id,
+                        "subject_id": payload.subject_id,
+                    },
+                    request=request,
+                )
+        except IntegrityError as exc:
+            raise ConflictException("Teacher is already assigned to this class subject") from exc
+
+    def remove_class_subject(
+        self,
+        teacher_id: int,
+        class_id: int,
+        subject_id: int,
+        actor_id: int,
+        request: Request,
+    ) -> None:
+        with transaction(self.session):
+            self.get_teacher(teacher_id)
+            if not self.teacher_class_subjects.remove(teacher_id, class_id, subject_id):
+                raise NotFoundException("Teacher is not assigned to this class subject")
+            self.audit.log(
+                action="teacher.class_subject.remove",
+                entity_type="teacher",
+                entity_id=teacher_id,
+                actor_user_id=actor_id,
+                old_values={"class_id": class_id, "subject_id": subject_id},
+                request=request,
+            )
+
+    def list_class_subjects(self, teacher_id: int):
+        self.get_teacher(teacher_id)
+        return self.teacher_class_subjects.list_for_teacher(teacher_id)
+
+    def academic_readiness(self, teacher_id: int) -> dict:
+        teacher = self.get_teacher(teacher_id)
+        assignments = self.teacher_class_subjects.list_for_teacher(teacher_id)
+        issues = []
+        if teacher.status != TeacherStatus.ACTIVE.value:
+            issues.append("Teacher is not active.")
+        if not assignments:
+            issues.append("No class and subject teaching assignment is configured.")
+        return {
+            "teacher_id": teacher_id,
+            "ready": not issues,
+            "assignments": [
+                {
+                    "class_id": class_id,
+                    "subject_id": subject_id,
+                    "class_name": class_name,
+                    "subject_name": subject_name,
+                }
+                for class_id, subject_id, class_name, subject_name in assignments
+            ],
+            "issues": issues,
+        }
 
     def assign_class(
         self,

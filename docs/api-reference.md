@@ -4,7 +4,7 @@
 
 The OpenAPI schema at `/openapi.json` and interactive `/docs` are the runtime contract. This file provides a browsable snapshot of every operation, its parameters, request and response schemas, and the field constraints exposed by OpenAPI. The shared response envelopes and route permissions are documented in [the technical guide](technical-documentation.md#8-authentication--authorization).
 
-**Operations:** 58
+**Operations:** 76
 
 ## Operations
 
@@ -93,9 +93,9 @@ Requires the parent email and mobile number submitted with the inquiry.
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `inquiry_code` | path | Yes | string; Example: `INQ202600007`; Inquiry tracking code returned when the inquiry was submitted. | Inquiry tracking code returned when the inquiry was submitted. |
-| `X-Parent-Email` | header | Yes | string (email); Email address supplied with the original inquiry. | Email address supplied with the original inquiry. |
-| `X-Parent-Mobile` | header | Yes | string; Parent/guardian mobile number supplied with the original inquiry. | Parent/guardian mobile number supplied with the original inquiry. |
+| `inquiry_code` | path | Yes | string; Example: `INQ202600007` | Inquiry tracking code returned when the inquiry was submitted. |
+| `X-Parent-Email` | header | Yes | string (email) | Email address supplied with the original inquiry. |
+| `X-Parent-Mobile` | header | Yes | string | Parent/guardian mobile number supplied with the original inquiry. |
 
 **Request body:** Not used by this endpoint.
 
@@ -698,6 +698,7 @@ HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Class created successfully",
   "data": {
     "id": 1,
+    "class_teacher_id": 1,
     "name": "Grade 5",
     "section": "A",
     "academic_year": "2026-2027",
@@ -734,12 +735,12 @@ List Classes
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `academic_year` | query | No | anyOf: string, null; Example: `2026-2027`; Filter by academic year. | Filter by academic year. |
-| `status` | query | No | anyOf: [`ClassStatus`](#classstatus), null; Filter by class state: active or inactive. | Filter by class state: active or inactive. |
-| `page` | query | No | integer; 1-based page number to return. | 1-based page number to return. |
-| `limit` | query | No | integer; Number of records per page, from 1 to 100. | Number of records per page, from 1 to 100. |
-| `sort_by` | query | No | string; Field used to sort results; supported fields depend on the endpoint. | Field used to sort results; supported fields depend on the endpoint. |
-| `sort_order` | query | No | string; Allowed values: `asc, desc`; Sort direction: asc or desc. | Sort direction: asc or desc. |
+| `academic_year` | query | No | anyOf: string, null; Example: `2026-2027` | Filter by academic year. |
+| `status` | query | No | anyOf: [`ClassStatus`](#classstatus), null | Filter by class state: active or inactive. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
 
 **Request body:** Not used by this endpoint.
 
@@ -754,6 +755,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "data": [
     {
       "id": 1,
+      "class_teacher_id": 1,
       "name": "Grade 5",
       "section": "A",
       "academic_year": "2026-2027",
@@ -797,7 +799,7 @@ Get Class
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `class_id` | path | Yes | integer | — |
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
 
 **Request body:** Not used by this endpoint.
 
@@ -811,6 +813,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Class fetched successfully",
   "data": {
     "id": 1,
+    "class_teacher_id": 1,
     "name": "Grade 5",
     "section": "A",
     "academic_year": "2026-2027",
@@ -847,7 +850,7 @@ Update Class
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `class_id` | path | Yes | integer | — |
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
 
 **Request body**
 
@@ -876,6 +879,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Class updated successfully",
   "data": {
     "id": 1,
+    "class_teacher_id": 1,
     "name": "Grade 5",
     "section": "A",
     "academic_year": "2026-2027",
@@ -912,7 +916,7 @@ Delete Class
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `class_id` | path | Yes | integer | — |
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
 
 **Request body:** Not used by this endpoint.
 
@@ -924,6 +928,365 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 {
   "success": true,
   "message": "Class deleted successfully",
+  "data": null,
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/classes/{class_id}/readiness`
+
+Get Class Academic Readiness
+
+**Group:** `classes`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `classes.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Class academic readiness fetched successfully",
+  "data": {
+    "class_id": 1,
+    "ready": true,
+    "class_teacher_id": 1,
+    "active_subject_ids": [
+      1
+    ],
+    "issues": []
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/classes/{class_id}/subjects`
+
+List Class Subjects
+
+**Group:** `classes`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `classes.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Class subjects fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "code": "MATH",
+      "name": "Mathematics",
+      "is_active": true
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/classes/{class_id}/subjects`
+
+Assign Class Subject
+
+**Group:** `classes`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `classes.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`ClassSubjectAssignRequest`](#classsubjectassignrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "subject_id": 1
+}
+```
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Subject assigned to class successfully",
+  "data": {
+    "class_id": 1,
+    "subject_id": 1
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `DELETE /api/v1/classes/{class_id}/subjects/{subject_id}`
+
+Remove Class Subject
+
+**Group:** `classes`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `classes.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Subject removed from class successfully",
+  "data": null,
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/classes/{class_id}/class-teacher`
+
+Assign Class Teacher
+
+**Group:** `classes`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `classes.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`ClassTeacherAssignRequest`](#classteacherassignrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "teacher_id": 1
+}
+```
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Class teacher assigned successfully",
+  "data": {
+    "class_id": 1,
+    "teacher_id": 1
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/classes/{class_id}/class-teacher`
+
+Replace Class Teacher
+
+**Group:** `classes`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `classes.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`ClassTeacherAssignRequest`](#classteacherassignrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "teacher_id": 1
+}
+```
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Class teacher updated successfully",
+  "data": {
+    "class_id": 1,
+    "teacher_id": 1
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `DELETE /api/v1/classes/{class_id}/class-teacher`
+
+Remove Class Teacher
+
+**Group:** `classes`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `classes.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Class teacher removed successfully",
   "data": null,
   "meta": {
     "request_id": "example-request-id",
@@ -957,13 +1320,13 @@ Paginated list of all student inquiries for staff review.
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `status` | query | No | anyOf: string, null; Filter by status: PENDING, UNDER_REVIEW, PROCESSING, INTERVIEW_SCHEDULED, INTERVIEW_PASS, INTERVIEW_FAIL, DOCUMENT_PENDING, DOCUMENT_VERIFICATION, ADMISSION_SUCCESS, or REJECTED. | Filter by status: PENDING, UNDER_REVIEW, PROCESSING, INTERVIEW_SCHEDULED, INTERVIEW_PASS, INTERVIEW_FAIL, DOCUMENT_PENDING, DOCUMENT_VERIFICATION, ADMISSION_SUCCESS, or REJECTED. |
-| `admission_for_class_id` | query | No | anyOf: integer, null; Example: `1`; Filter by requested catalog class ID. | Filter by requested catalog class ID. |
-| `search` | query | No | anyOf: string, null; Search by student name, inquiry code, email, or mobile. | Search by student name, inquiry code, email, or mobile. |
-| `page` | query | No | integer; 1-based page number to return. | 1-based page number to return. |
-| `limit` | query | No | integer; Number of records per page, from 1 to 100. | Number of records per page, from 1 to 100. |
-| `sort_by` | query | No | string; Field used to sort results; supported fields depend on the endpoint. | Field used to sort results; supported fields depend on the endpoint. |
-| `sort_order` | query | No | string; Allowed values: `asc, desc`; Sort direction: asc or desc. | Sort direction: asc or desc. |
+| `status` | query | No | anyOf: string, null | Filter by status: PENDING, UNDER_REVIEW, PROCESSING, INTERVIEW_SCHEDULED, INTERVIEW_PASS, INTERVIEW_FAIL, DOCUMENT_PENDING, DOCUMENT_VERIFICATION, ADMISSION_SUCCESS, or REJECTED. |
+| `admission_for_class_id` | query | No | anyOf: integer, null; Example: `1` | Filter by requested catalog class ID. |
+| `search` | query | No | anyOf: string, null | Search by student name, inquiry code, email, or mobile. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
 
 **Request body:** Not used by this endpoint.
 
@@ -1041,7 +1404,7 @@ Get full inquiry details including status history.
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `inquiry_id` | path | Yes | integer | — |
+| `inquiry_id` | path | Yes | integer | Numeric database ID of the inquiry. Use the `id` from GET /api/v1/inquiries; this is not the human-readable inquiry_code. |
 
 **Request body:** Not used by this endpoint.
 
@@ -1111,7 +1474,7 @@ Update staff-only fields (class mapping, internal notes).
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `inquiry_id` | path | Yes | integer | — |
+| `inquiry_id` | path | Yes | integer | Numeric database ID of the inquiry. Use the `id` from GET /api/v1/inquiries; this is not the human-readable inquiry_code. |
 
 **Request body**
 
@@ -1193,7 +1556,7 @@ Move inquiry from PENDING to UNDER_REVIEW.
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `inquiry_id` | path | Yes | integer | — |
+| `inquiry_id` | path | Yes | integer | Numeric database ID of the inquiry. Use the `id` from GET /api/v1/inquiries; this is not the human-readable inquiry_code. |
 
 **Request body**
 
@@ -1236,7 +1599,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "admission_for_class": "Grade 5",
     "last_school_percentage": "87.50",
     "admission_for_class_id": 1,
-    "status": "PENDING",
+    "status": "UNDER_REVIEW",
     "rejection_reason": "Required admission document is missing.",
     "internal_notes": "Documents reviewed by the admissions office.",
     "created_at": "2026-10-20T10:00:00Z",
@@ -1274,7 +1637,7 @@ Move inquiry from UNDER_REVIEW to PROCESSING (eligible).
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `inquiry_id` | path | Yes | integer | — |
+| `inquiry_id` | path | Yes | integer | Numeric database ID of the inquiry. Use the `id` from GET /api/v1/inquiries; this is not the human-readable inquiry_code. |
 
 **Request body**
 
@@ -1355,7 +1718,7 @@ Reject inquiry with a parent-visible reason; status becomes REJECTED.
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `inquiry_id` | path | Yes | integer | — |
+| `inquiry_id` | path | Yes | integer | Numeric database ID of the inquiry. Use the `id` from GET /api/v1/inquiries; this is not the human-readable inquiry_code. |
 
 **Request body**
 
@@ -1666,6 +2029,56 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 
 **Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
 
+### `GET /api/v1/students/{student_id}/subjects`
+
+List Student Subjects
+
+**Group:** `students`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `students.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Student class subjects fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "code": "MATH",
+      "name": "Mathematics",
+      "is_active": true
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
 ### `POST /api/v1/students`
 
 Create Student
@@ -1748,13 +2161,13 @@ List Students
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `status` | query | No | anyOf: string, null; Filter by student status: prospective, active, inactive, graduated, or transferred. | Filter by student status: prospective, active, inactive, graduated, or transferred. |
-| `current_class_id` | query | No | anyOf: integer, null; Example: `1`; Filter by current class catalog ID. | Filter by current class catalog ID. |
-| `search` | query | No | anyOf: string, null; Search by student name or admission number. | Search by student name or admission number. |
-| `page` | query | No | integer; 1-based page number to return. | 1-based page number to return. |
-| `limit` | query | No | integer; Number of records per page, from 1 to 100. | Number of records per page, from 1 to 100. |
-| `sort_by` | query | No | string; Field used to sort results; supported fields depend on the endpoint. | Field used to sort results; supported fields depend on the endpoint. |
-| `sort_order` | query | No | string; Allowed values: `asc, desc`; Sort direction: asc or desc. | Sort direction: asc or desc. |
+| `status` | query | No | anyOf: string, null | Filter by student status: prospective, active, inactive, graduated, or transferred. |
+| `current_class_id` | query | No | anyOf: integer, null; Example: `1` | Filter by current class catalog ID. |
+| `search` | query | No | anyOf: string, null | Search by student name or admission number. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
 
 **Request body:** Not used by this endpoint.
 
@@ -1816,7 +2229,7 @@ Get Student
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `student_id` | path | Yes | integer | — |
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
 
 **Request body:** Not used by this endpoint.
 
@@ -1870,7 +2283,7 @@ Update Student
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `student_id` | path | Yes | integer | — |
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
 
 **Request body**
 
@@ -1941,7 +2354,7 @@ Delete Student
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `student_id` | path | Yes | integer | — |
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
 
 **Request body:** Not used by this endpoint.
 
@@ -1984,7 +2397,7 @@ Update Student Status
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `student_id` | path | Yes | integer | — |
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
 
 **Request body**
 
@@ -2050,7 +2463,7 @@ Assign Student Class
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `student_id` | path | Yes | integer | — |
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
 
 **Request body**
 
@@ -2102,6 +2515,327 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 
 **Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
 
+### `POST /api/v1/subjects`
+
+Create Subject
+
+**Group:** `subjects`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `subjects.create`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`SubjectCreateRequest`](#subjectcreaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "code": "MATH",
+  "name": "Mathematics"
+}
+```
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Subject created successfully",
+  "data": {
+    "id": 1,
+    "code": "MATH",
+    "name": "Mathematics",
+    "is_active": true
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/subjects`
+
+List Subjects
+
+**Group:** `subjects`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `subjects.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `active` | query | No | anyOf: boolean, null | Filter by active state. |
+| `search` | query | No | anyOf: string, null | Search code or name. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Records fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "code": "MATH",
+      "name": "Mathematics",
+      "is_active": true
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  },
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total_records": 1,
+    "total_pages": 1
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/subjects/{subject_id}`
+
+Get Subject
+
+**Group:** `subjects`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `subjects.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Subject fetched successfully",
+  "data": {
+    "id": 1,
+    "code": "MATH",
+    "name": "Mathematics",
+    "is_active": true
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/subjects/{subject_id}`
+
+Update Subject
+
+**Group:** `subjects`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `subjects.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`SubjectUpdateRequest`](#subjectupdaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "code": "MATH",
+  "name": "Mathematics"
+}
+```
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Subject updated successfully",
+  "data": {
+    "id": 1,
+    "code": "MATH",
+    "name": "Mathematics",
+    "is_active": true
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `DELETE /api/v1/subjects/{subject_id}`
+
+Deactivate Subject
+
+**Group:** `subjects`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `subjects.delete`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Subject deactivated successfully",
+  "data": {
+    "id": 1,
+    "code": "MATH",
+    "name": "Mathematics",
+    "is_active": false
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/subjects/{subject_id}/activate`
+
+Activate Subject
+
+**Group:** `subjects`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `subjects.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Subject activated successfully",
+  "data": {
+    "id": 1,
+    "code": "MATH",
+    "name": "Mathematics",
+    "is_active": true
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
 ### `GET /api/v1/inquiry-admissions`
 
 List Inquiry Admissions
@@ -2116,12 +2850,12 @@ List Inquiry Admissions
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `status` | query | No | anyOf: string, null; Filter by admission state: draft, submitted, document_pending, document_verification, approved, or rejected. | Filter by admission state: draft, submitted, document_pending, document_verification, approved, or rejected. |
-| `academic_year` | query | No | anyOf: string, null; Example: `2026-2027`; Filter by academic year. | Filter by academic year. |
-| `page` | query | No | integer; 1-based page number to return. | 1-based page number to return. |
-| `limit` | query | No | integer; Number of records per page, from 1 to 100. | Number of records per page, from 1 to 100. |
-| `sort_by` | query | No | string; Field used to sort results; supported fields depend on the endpoint. | Field used to sort results; supported fields depend on the endpoint. |
-| `sort_order` | query | No | string; Allowed values: `asc, desc`; Sort direction: asc or desc. | Sort direction: asc or desc. |
+| `status` | query | No | anyOf: string, null | Filter by admission state: draft, submitted, document_pending, document_verification, approved, or rejected. |
+| `academic_year` | query | No | anyOf: string, null; Example: `2026-2027` | Filter by academic year. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
 
 **Request body:** Not used by this endpoint.
 
@@ -2471,7 +3205,7 @@ Verify Document
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
 | `document_id` | path | Yes | integer | — |
-| `verified` | query | No | boolean; Set true to verify the document or false to reject it. | Set true to verify the document or false to reject it. |
+| `verified` | query | No | boolean | Set true to verify the document or false to reject it. |
 
 **Request body**
 
@@ -2765,12 +3499,12 @@ List Legacy Admissions
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `status` | query | No | anyOf: string, null; Filter by legacy admission state. | Filter by legacy admission state. |
-| `academic_year` | query | No | anyOf: string, null; Example: `2026-2027`; Filter by academic year. | Filter by academic year. |
-| `page` | query | No | integer; 1-based page number to return. | 1-based page number to return. |
-| `limit` | query | No | integer; Number of records per page, from 1 to 100. | Number of records per page, from 1 to 100. |
-| `sort_by` | query | No | string; Field used to sort results; supported fields depend on the endpoint. | Field used to sort results; supported fields depend on the endpoint. |
-| `sort_order` | query | No | string; Allowed values: `asc, desc`; Sort direction: asc or desc. | Sort direction: asc or desc. |
+| `status` | query | No | anyOf: string, null | Filter by legacy admission state. |
+| `academic_year` | query | No | anyOf: string, null; Example: `2026-2027` | Filter by academic year. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
 
 **Request body:** Not used by this endpoint.
 
@@ -2894,12 +3628,12 @@ List Teachers
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `status` | query | No | anyOf: [`TeacherStatus`](#teacherstatus), null; Filter by employment status: active, inactive, or resigned. | Filter by employment status: active, inactive, or resigned. |
-| `search` | query | No | anyOf: string, null; Search by teacher name or employee number. | Search by teacher name or employee number. |
-| `page` | query | No | integer; 1-based page number to return. | 1-based page number to return. |
-| `limit` | query | No | integer; Number of records per page, from 1 to 100. | Number of records per page, from 1 to 100. |
-| `sort_by` | query | No | string; Field used to sort results; supported fields depend on the endpoint. | Field used to sort results; supported fields depend on the endpoint. |
-| `sort_order` | query | No | string; Allowed values: `asc, desc`; Sort direction: asc or desc. | Sort direction: asc or desc. |
+| `status` | query | No | anyOf: [`TeacherStatus`](#teacherstatus), null | Filter by employment status: active, inactive, or resigned. |
+| `search` | query | No | anyOf: string, null | Search by teacher name or employee number. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
 
 **Request body:** Not used by this endpoint.
 
@@ -2959,7 +3693,7 @@ Get Teacher
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body:** Not used by this endpoint.
 
@@ -3011,7 +3745,7 @@ Update Teacher
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body**
 
@@ -3068,6 +3802,10 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 
 Assign Subject
 
+Compatibility assignment for a global teacher/subject link.
+
+Use the class-subjects endpoint for class-specific teaching allocations.
+
 **Group:** `teachers`
 
 **OpenAPI authentication:** `HTTPBearer`
@@ -3078,7 +3816,7 @@ Assign Subject
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body**
 
@@ -3134,7 +3872,7 @@ List Teacher Subjects
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body:** Not used by this endpoint.
 
@@ -3169,6 +3907,215 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 
 **Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
 
+### `GET /api/v1/teachers/{teacher_id}/class-subjects`
+
+List Teacher Class Subjects
+
+**Group:** `teachers`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `teachers.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Teacher class-subject assignments fetched successfully",
+  "data": [
+    {
+      "class_id": 1,
+      "subject_id": 1,
+      "class_name": "Grade 5",
+      "subject_name": "Mathematics"
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/teachers/{teacher_id}/class-subjects`
+
+Assign Teacher Class Subject
+
+**Group:** `teachers`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `teachers.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`TeacherClassSubjectAssignRequest`](#teacherclasssubjectassignrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "class_id": 1,
+  "subject_id": 1
+}
+```
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Teacher assigned to class subject successfully",
+  "data": {
+    "teacher_id": 1,
+    "class_id": 1,
+    "subject_id": 1
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/teachers/{teacher_id}/academic-readiness`
+
+Get Teacher Academic Readiness
+
+**Group:** `teachers`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `teachers.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Teacher academic readiness fetched successfully",
+  "data": {
+    "teacher_id": 1,
+    "ready": true,
+    "assignments": [
+      {
+        "class_id": 1,
+        "subject_id": 1,
+        "class_name": "Grade 5",
+        "subject_name": "Mathematics"
+      }
+    ],
+    "issues": []
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `DELETE /api/v1/teachers/{teacher_id}/class-subjects/{class_id}/{subject_id}`
+
+Remove Teacher Class Subject
+
+**Group:** `teachers`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `teachers.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Teacher class-subject assignment removed successfully",
+  "data": null,
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
 ### `POST /api/v1/teachers/{teacher_id}/class`
 
 Assign Class
@@ -3183,7 +4130,7 @@ Assign Class
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body**
 
@@ -3239,7 +4186,7 @@ List Teacher Classes
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body:** Not used by this endpoint.
 
@@ -3289,7 +4236,7 @@ Record Attendance
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body**
 
@@ -3351,7 +4298,7 @@ Get Teacher Salary
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body:** Not used by this endpoint.
 
@@ -3402,7 +4349,7 @@ Create Salary Payment
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
-| `teacher_id` | path | Yes | integer | — |
+| `teacher_id` | path | Yes | integer | Numeric database ID of the teacher. |
 
 **Request body**
 
@@ -3792,6 +4739,18 @@ Whether a school class record is open for admissions.
 
 **Allowed values:** `active`, `inactive`
 
+### `ClassSubjectAssignRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `subject_id` | integer | Yes | — | Existing active subject catalog ID. |
+
+### `ClassTeacherAssignRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `teacher_id` | integer | Yes | — | Existing active teacher ID. |
+
 ### `ClassUpdateRequest`
 
 | Property | Type | Required | Constraints | Description |
@@ -4036,6 +4995,27 @@ Parent must prove ownership via inquiry_code + email + parent_mobile.
 | Property | Type | Required | Constraints | Description |
 |---|---|---:|---|---|
 | `subject_id` | integer | Yes | — | ID of the subject to assign. |
+
+### `SubjectCreateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `code` | string | Yes | Min length: `1`; Max length: `50` | Unique subject code.; Example: `MATH` |
+| `name` | string | Yes | Min length: `1`; Max length: `100` | Subject display name.; Example: `Mathematics` |
+
+### `SubjectUpdateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `code` | anyOf: string, null | No | — | Updated unique subject code.; Example: `MATH` |
+| `name` | anyOf: string, null | No | — | Updated subject display name.; Example: `Mathematics` |
+
+### `TeacherClassSubjectAssignRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | integer | Yes | — | Class offering this subject. |
+| `subject_id` | integer | Yes | — | Subject already offered to the class. |
 
 ### `TeacherCreateRequest`
 
