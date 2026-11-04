@@ -213,7 +213,7 @@ Copy `.env.example` to `.env` and update the settings for your machine:
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token TTL | `30` |
 | `PASSWORD_HASH_SCHEME` | Hash scheme | `argon2` |
 | `LOG_LEVEL` | Logging level | `INFO` |
-| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000` |
+| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173` |
 | `UPLOAD_DIR` | Document storage path | `uploads` (optional) |
 | `MAX_UPLOAD_SIZE_MB` | Max upload size | `5` (optional) |
 | `ALLOWED_UPLOAD_EXTENSIONS` | Allowed extensions | `pdf,jpg,jpeg,png` |
@@ -644,6 +644,25 @@ sequenceDiagram
     C->>API: POST /auth/logout (refresh_token)
     API->>DB: Revoke refresh token
 ```
+
+The API returns both tokens in the login JSON response; it does not set HttpOnly cookies.
+The frontend therefore keeps the access and refresh tokens in JavaScript memory only,
+never in local storage, session storage, or a persistent browser cookie. Reloading the page
+ends the frontend session and requires another sign-in. Protected requests use
+`Authorization: Bearer <access_token>`. On a `401`, the frontend makes one shared
+`POST /auth/refresh-token` request with the current refresh token, then retries the original
+request once. The refresh endpoint returns a new access token but does not rotate the
+refresh token.
+This keeps tokens out of persistent browser storage, but JavaScript running in the page can
+still access the active session; production deployments must use HTTPS and protect the
+frontend against cross-site scripting.
+
+Logout sends the refresh token in `POST /auth/logout` and clears frontend memory even if
+the request fails. The backend revokes that refresh token; existing access JWTs are not
+revoked and remain usable until their short access-token expiry. A `403` does not trigger a
+refresh: the frontend displays an access-denied state. Frontend navigation and action
+permission checks are usability controls only; the API's role and permission dependencies
+remain authoritative.
 
 ### 8.2 Token Claims (Access)
 
