@@ -18,6 +18,15 @@ class ClassStatus(StrEnum):
     INACTIVE = "inactive"
 
 
+class BillingFrequency(StrEnum):
+    """Frequency used to bill a recurring fee component."""
+
+    MONTHLY = "MONTHLY"
+    QUARTERLY = "QUARTERLY"
+    ANNUALLY = "ANNUALLY"
+    ONE_TIME = "ONE_TIME"
+
+
 class StudentStatus(StrEnum):
     """Enrollment lifecycle for a registered student."""
 

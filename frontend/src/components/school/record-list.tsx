@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { ErrorState, LoadingState } from '@/components/ui/async-state'
 import { Card, CardContent } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
@@ -31,6 +31,14 @@ export function RecordList<T>({
   emptyMessage,
   toolbar,
 }: RecordListProps<T>) {
+  const lastAvailablePage = Math.max(pagination?.total_pages ?? 1, 1)
+  const displayedPage = Math.min(pagination?.page ?? 1, lastAvailablePage)
+
+  useEffect(() => {
+    if (!pagination || !onPageChange) return
+    if (pagination.page > lastAvailablePage) onPageChange(lastAvailablePage)
+  }, [lastAvailablePage, onPageChange, pagination])
+
   if (isLoading) return <LoadingState label="Loading records" />
   if (error) return <ErrorState description={error} onRetry={onRetry} />
 
@@ -49,7 +57,7 @@ export function RecordList<T>({
       {pagination && onPageChange ? (
         <PaginationControls
           onPageChange={onPageChange}
-          page={pagination.page}
+          page={displayedPage}
           pageSize={pagination.limit}
           totalPages={pagination.total_pages}
           totalRecords={pagination.total_records}

@@ -7,6 +7,7 @@ type SearchFieldProps = {
   placeholder?: string
   value?: string
   onChange?: (value: string) => void
+  showLabel?: boolean
 }
 
 export function SearchField({
@@ -14,25 +15,26 @@ export function SearchField({
   placeholder = 'Search',
   value,
   onChange,
+  showLabel = false,
 }: SearchFieldProps) {
   const inputId = useId()
 
   return (
-    <div className="relative w-full max-w-sm">
-      <label className="sr-only" htmlFor={inputId}>
-        {label}
-      </label>
-      <Search
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
-      />
-      <Input
-        className="h-10 pl-9"
-        id={inputId}
-        onChange={(event) => onChange?.(event.target.value)}
-        placeholder={placeholder}
-        value={value}
-      />
+    <div className="grid min-w-0 w-full gap-2">
+      <label className={showLabel ? 'text-sm font-medium text-slate-800' : 'sr-only'} htmlFor={inputId}>{label}</label>
+      <div className="relative w-full min-w-0">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+        />
+        <Input
+          className="h-10 pl-9"
+          id={inputId}
+          onChange={(event) => onChange?.(event.target.value)}
+          placeholder={placeholder}
+          value={value}
+        />
+      </div>
     </div>
   )
 }

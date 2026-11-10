@@ -69,6 +69,14 @@ export function ConfirmDialog({
         <DialogFooter>
           <Button
             disabled={isPending}
+            onClick={() => setOpen(false)}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={isPending}
             onClick={() => void confirm()}
             type="button"
             variant={destructive ? 'destructive' : 'default'}

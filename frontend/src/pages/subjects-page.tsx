@@ -69,7 +69,7 @@ function SubjectFormDialog({
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       ) : null}
-      <form className="grid gap-4" onSubmit={form.handleSubmit((values) => {
+      <form className="grid gap-4" noValidate onSubmit={form.handleSubmit((values) => {
         setFormError(null)
         mutation.mutate(values)
       })}>

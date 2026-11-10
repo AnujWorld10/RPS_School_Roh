@@ -7,24 +7,26 @@ from app.core.config import get_settings
 from app.core.permissions import DEFAULT_PERMISSIONS, DEFAULT_ROLES, ROLE_PERMISSION_MAP
 from app.core.security import hash_password, validate_password_strength
 from app.db.session import SessionLocal
+from app.models.business_id_sequence import BusinessIDSequence
 from app.models.class_model import Class
 from app.models.enums import ClassStatus, UserStatus
 from app.models.permission import Permission, RolePermission
 from app.models.role import Role, UserRole
+from app.models.student import Student
 from app.models.user import User
 from app.repositories.tokens import RefreshTokenRepository
 
 DEFAULT_CLASSES: list[tuple[str, str | None, str, int]] = [
-    ("1st Grade", "A", "2025-26", 40),
-    ("2nd Grade", "A", "2025-26", 40),
-    ("3rd Grade", "A", "2025-26", 40),
-    ("4th Grade", "A", "2025-26", 40),
-    ("5th Grade", "A", "2025-26", 40),
-    ("6th Grade", "A", "2025-26", 40),
-    ("7th Grade", "A", "2025-26", 40),
-    ("8th Grade", "A", "2025-26", 40),
-    ("9th Grade", "A", "2025-26", 40),
-    ("10th Grade", "A", "2025-26", 40),
+    ("1st Grade", "A", "2026-2027", 40),
+    ("2nd Grade", "A", "2026-2027", 40),
+    ("3rd Grade", "A", "2026-2027", 40),
+    ("4th Grade", "A", "2026-2027", 40),
+    ("5th Grade", "A", "2026-2027", 40),
+    ("6th Grade", "A", "2026-2027", 40),
+    ("7th Grade", "A", "2026-2027", 40),
+    ("8th Grade", "A", "2026-2027", 40),
+    ("9th Grade", "A", "2026-2027", 40),
+    ("10th Grade", "A", "2026-2027", 40),
 ]
 
 logger = logging.getLogger("app.seed")
@@ -43,6 +45,7 @@ def seed_database(session: Session | None = None) -> None:
     try:
         _seed_roles_and_permissions(session)
         _seed_super_admin(session)
+        _seed_business_id_sequences(session)
         _seed_classes(session)
         session.commit()
     except Exception:
@@ -122,6 +125,24 @@ def _seed_super_admin(session: Session) -> None:
     session.flush()
     session.add(UserRole(user_id=user.id, role_id=role.id))
     logger.info("seeded initial super admin user: %s", email)
+
+
+def _seed_business_id_sequences(session: Session) -> None:
+    sequence = session.get(BusinessIDSequence, "student")
+    if sequence is None:
+        existing_codes = session.scalars(
+            select(Student.student_code).where(Student.student_code.like("RPS%"))
+        )
+        last_value = max(
+            (int(code[3:]) for code in existing_codes if len(code) == 8 and code[3:].isdigit()),
+            default=0,
+        )
+        session.add(
+            BusinessIDSequence(
+                sequence_name="student",
+                last_value=last_value,
+            )
+        )
 
 
 def _seed_classes(session: Session) -> None:

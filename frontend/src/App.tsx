@@ -1,34 +1,70 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import {
   RequireAuthentication,
   RequirePermission,
+  RequireRole,
   RedirectAuthenticatedUser,
 } from '@/components/auth/route-guards'
 import { AppShell } from '@/components/layout/app-shell'
-import { EmptyState } from '@/components/ui/async-state'
+import { PublicSchoolPage } from '@/components/layout/public-school-navigation'
+import { publicSchoolPages } from '@/components/layout/public-school-pages'
+import { EmptyState, LoadingState } from '@/components/ui/async-state'
 import { PageHeader } from '@/components/ui/page-header'
-import { LoginPage } from '@/pages/login-page'
-import { ModulePage } from '@/pages/module-page'
-import { StudentsPage } from '@/pages/students-page'
-import { TeachersPage } from '@/pages/teachers-page'
-import { ClassesPage } from '@/pages/classes-page'
-import { SubjectsPage } from '@/pages/subjects-page'
+import {
+  PublicAdmissionSubmissionPage,
+  PublicInquiryPage,
+  PublicInquiryStatusPage,
+  PublicInquiryUpdatePage,
+  PublicPortalLayout,
+} from '@/pages/public-admissions-pages'
 
-function DashboardPage() {
-  return (
-    <>
-      <PageHeader
-        description="A shared workspace for school administration. Live summaries will be added when dashboard data is integrated."
-        title="Dashboard"
-      />
-      <EmptyState
-        description="No school data is loaded in this phase. The frontend foundation is ready for future API integration."
-        title="Your workspace is ready"
-      />
-    </>
-  )
-}
-
+const DashboardPage = lazy(() =>
+  import('@/pages/dashboard-page').then(({ DashboardPage }) => ({ default: DashboardPage })),
+)
+const LoginPage = lazy(() =>
+  import('@/pages/login-page').then(({ LoginPage }) => ({ default: LoginPage })),
+)
+const StudentRegistrationPage = lazy(() =>
+  import('@/pages/student-registration-page').then(
+    ({ StudentRegistrationPage }) => ({ default: StudentRegistrationPage }),
+  ),
+)
+const StudentPortalPage = lazy(() =>
+  import('@/pages/student-portal-page').then(
+    ({ StudentPortalPage }) => ({ default: StudentPortalPage }),
+  ),
+)
+const StudentsPage = lazy(() =>
+  import('@/pages/students-page').then(({ StudentsPage }) => ({ default: StudentsPage })),
+)
+const TeachersPage = lazy(() =>
+  import('@/pages/teachers-page').then(({ TeachersPage }) => ({ default: TeachersPage })),
+)
+const ClassesPage = lazy(() =>
+  import('@/pages/classes-page').then(({ ClassesPage }) => ({ default: ClassesPage })),
+)
+const SubjectsPage = lazy(() =>
+  import('@/pages/subjects-page').then(({ SubjectsPage }) => ({ default: SubjectsPage })),
+)
+const InquiriesPage = lazy(() =>
+  import('@/pages/inquiries-page').then(({ InquiriesPage }) => ({ default: InquiriesPage })),
+)
+const InterviewsPage = lazy(() =>
+  import('@/pages/interviews-page').then(({ InterviewsPage }) => ({ default: InterviewsPage })),
+)
+const AdmissionsPage = lazy(() =>
+  import('@/pages/admissions-page').then(({ AdmissionsPage }) => ({ default: AdmissionsPage })),
+)
+const DocumentsPage = lazy(() =>
+  import('@/pages/admissions-page').then(({ DocumentsPage }) => ({ default: DocumentsPage })),
+)
+const RolePortalPage = lazy(() =>
+  import('@/pages/role-portal-page').then(({ RolePortalPage }) => ({ default: RolePortalPage })),
+)
+const SchoolEventsPage = lazy(() =>
+  import('@/pages/role-portal-page').then(({ SchoolEventsPage }) => ({ default: SchoolEventsPage })),
+)
 function NotFoundPage() {
   return (
     <>
@@ -44,81 +80,90 @@ function NotFoundPage() {
 function App() {
   return (
     <Routes>
+      <Route element={<PublicSchoolPage title="Home" />} path="/" />
       <Route element={<RedirectAuthenticatedUser />}>
-        <Route element={<LoginPage />} path="/login" />
+        <Route
+          element={
+            <Suspense fallback={<LoadingState label="Loading sign-in" />}>
+              <LoginPage />
+            </Suspense>
+          }
+          path="/login"
+        />
+      </Route>
+      <Route
+        element={
+          <Suspense fallback={<LoadingState label="Loading student registration" />}>
+            <StudentRegistrationPage />
+          </Suspense>
+        }
+        path="/student/register"
+      />
+      {Object.entries(publicSchoolPages).map(([path, title]) => (
+        <Route
+          element={<PublicSchoolPage title={title} />}
+          key={path}
+          path={path}
+        />
+      ))}
+      <Route element={<PublicPortalLayout />}>
+        <Route element={<PublicInquiryPage />} path="/apply" />
+        <Route element={<PublicInquiryStatusPage />} path="/application/status" />
+        <Route element={<PublicInquiryUpdatePage />} path="/application/update" />
+        <Route element={<PublicAdmissionSubmissionPage />} path="/application/submit" />
       </Route>
       <Route element={<RequireAuthentication />}>
         <Route element={<AppShell />}>
-          <Route element={<DashboardPage />} path="/" />
+          <Route element={<DashboardPage />} path="/dashboard" />
           <Route element={<RequirePermission anyOf={['students.read']}><StudentsPage /></RequirePermission>} path="/students" />
           <Route element={<RequirePermission anyOf={['teachers.read']}><TeachersPage /></RequirePermission>} path="/teachers" />
           <Route element={<RequirePermission anyOf={['classes.read']}><ClassesPage /></RequirePermission>} path="/classes" />
           <Route element={<RequirePermission anyOf={['subjects.read']}><SubjectsPage /></RequirePermission>} path="/subjects" />
           <Route
             element={
-              <RequirePermission anyOf={['inquiries.read']}>
-                <ModulePage
-                  description="Student admission inquiry review and status transitions."
-                  title="Inquiries"
-                />
-              </RequirePermission>
+              <RequirePermission anyOf={['inquiries.read']}><InquiriesPage /></RequirePermission>
             }
             path="/inquiries"
           />
           <Route
             element={
-              <RequirePermission anyOf={['interviews.read']}>
-                <ModulePage
-                  description="Interview scheduling and outcome recording."
-                  title="Interviews"
-                />
-              </RequirePermission>
+              <RequirePermission allOf={['interviews.read', 'inquiries.read']}><InterviewsPage /></RequirePermission>
             }
             path="/interviews"
           />
           <Route
             element={
-              <RequirePermission anyOf={['admissions.read']}>
-                <ModulePage
-                  description="Inquiry-linked admission applications, approval, rejection, and enrollment."
-                  title="Admissions"
-                />
-              </RequirePermission>
+              <RequirePermission anyOf={['admissions.read']}><AdmissionsPage /></RequirePermission>
             }
             path="/admissions"
           />
           <Route
             element={
-              <RequirePermission anyOf={['admissions.update', 'admissions.verify_documents']}>
-                <ModulePage
-                  description="Admission document upload metadata and staff verification workflows."
-                  title="Documents"
-                />
-              </RequirePermission>
+              <RequirePermission anyOf={['admissions.read']}><DocumentsPage /></RequirePermission>
             }
             path="/documents"
           />
           <Route
             element={
-              <RequirePermission anyOf={['teachers.update']}>
-                <ModulePage
-                  description="Teacher attendance recording. Attendance history is not available in the current API."
-                  title="Teacher attendance"
-                />
-              </RequirePermission>
+              <RequireRole anyOf={['STUDENT']}>
+                <Suspense fallback={<LoadingState label="Loading student dashboard" />}>
+                  <StudentPortalPage />
+                </Suspense>
+              </RequireRole>
             }
-            path="/teacher-attendance"
+            path="/portal/student"
           />
           <Route
-            element={
-              <RequirePermission anyOf={['teachers.salary.read', 'teachers.salary.pay']}>
-                <ModulePage
-                  description="Teacher salary details and salary payment recording."
-                  title="Salary payments"
-                />
-              </RequirePermission>
-            }
-            path="/salary"
+            element={<RequireRole anyOf={['PARENT']}><RolePortalPage role="parent" /></RequireRole>}
+            path="/portal/parent"
+          />
+          <Route
+            element={<RequireRole anyOf={['TEACHER']}><RolePortalPage role="teacher" /></RequireRole>}
+            path="/portal/teacher"
+          />
+          <Route
+            element={<RequirePermission anyOf={['events.read']}><SchoolEventsPage /></RequirePermission>}
+            path="/events"
           />
           <Route element={<NotFoundPage />} path="*" />
         </Route>

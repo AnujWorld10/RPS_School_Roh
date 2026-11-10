@@ -16,8 +16,10 @@ export function PaginationControls({
   pageSize = 10,
   onPageChange,
 }: PaginationControlsProps) {
-  const firstRecord = totalRecords === 0 ? 0 : (page - 1) * pageSize + 1
-  const lastRecord = Math.min(page * pageSize, totalRecords)
+  const displayedTotalPages = Math.max(totalPages, 1)
+  const displayedPage = Math.min(Math.max(page, 1), displayedTotalPages)
+  const firstRecord = totalRecords === 0 ? 0 : (displayedPage - 1) * pageSize + 1
+  const lastRecord = Math.min(displayedPage * pageSize, totalRecords)
 
   return (
     <nav
@@ -31,8 +33,8 @@ export function PaginationControls({
       <div className="flex items-center gap-2">
         <Button
           aria-label="Go to previous page"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
+          disabled={displayedPage <= 1}
+          onClick={() => onPageChange(displayedPage - 1)}
           size="sm"
           variant="outline"
         >
@@ -40,12 +42,12 @@ export function PaginationControls({
           Previous
         </Button>
         <span aria-current="page" className="min-w-16 text-center text-sm text-slate-600">
-          Page {page} of {totalPages}
+          Page {displayedPage} of {displayedTotalPages}
         </span>
         <Button
           aria-label="Go to next page"
-          disabled={page >= totalPages || totalPages === 0}
-          onClick={() => onPageChange(page + 1)}
+          disabled={displayedPage >= displayedTotalPages || totalPages === 0}
+          onClick={() => onPageChange(displayedPage + 1)}
           size="sm"
           variant="outline"
         >

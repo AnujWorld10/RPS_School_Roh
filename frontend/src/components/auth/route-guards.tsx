@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/features/auth/auth-context'
-import { hasAnyPermission } from '@/features/auth/permissions'
+import { hasAnyPermission, roleLandingPath } from '@/features/auth/permissions'
 import { LoadingState } from '@/components/ui/async-state'
 import { ForbiddenPage } from '@/pages/forbidden-page'
 
@@ -31,15 +31,28 @@ export function RedirectAuthenticatedUser() {
   if (auth.isLoading) {
     return <LoadingState label="Checking your session" />
   }
-  return auth.isAuthenticated ? <Navigate replace to="/" /> : <Outlet />
+  return auth.isAuthenticated ? <Navigate replace to={roleLandingPath(auth.user?.roles ?? [])} /> : <Outlet />
 }
 
-export function RequirePermission({
+export function RequireRole({
   anyOf,
   children,
 }: PropsWithChildren<{ anyOf: string[] }>) {
   const { user } = useAuth()
-  if (!hasAnyPermission(user?.permissions ?? [], anyOf)) {
+  if (!user?.roles.some((role) => anyOf.includes(role))) {
+    return <ForbiddenPage />
+  }
+  return children ?? <Outlet />
+}
+
+export function RequirePermission({
+  anyOf,
+  allOf = [],
+  children,
+}: PropsWithChildren<{ anyOf?: string[]; allOf?: string[] }>) {
+  const { user } = useAuth()
+  const permissions = user?.permissions ?? []
+  if (!hasAnyPermission(permissions, anyOf ?? []) || !allOf.every((permission) => permissions.includes(permission))) {
     return <ForbiddenPage />
   }
   return children

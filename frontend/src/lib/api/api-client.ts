@@ -31,6 +31,11 @@ export const apiClient = axios.create({
   headers: { Accept: 'application/json' },
 })
 
+export const publicApiClient = axios.create({
+  baseURL: apiBaseUrl,
+  headers: { Accept: 'application/json' },
+})
+
 let refreshInFlight: Promise<void> | null = null
 
 async function refreshAccessToken() {
@@ -119,6 +124,33 @@ export async function requestData<T>(config: AxiosRequestConfig): Promise<T> {
   try {
     const response = await apiClient.request<ApiEnvelope<T>>(config)
     return unwrapEnvelope(response.data)
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export async function requestPublicData<T>(config: AxiosRequestConfig): Promise<T> {
+  try {
+    const response = await publicApiClient.request<ApiEnvelope<T>>(config)
+    return unwrapEnvelope(response.data)
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export async function requestBlob(config: AxiosRequestConfig): Promise<Blob> {
+  try {
+    const response = await apiClient.request<Blob>({ ...config, responseType: 'blob' })
+    return response.data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export async function requestPublicBlob(config: AxiosRequestConfig): Promise<Blob> {
+  try {
+    const response = await publicApiClient.request<Blob>({ ...config, responseType: 'blob' })
+    return response.data
   } catch (error) {
     throw toApiError(error)
   }

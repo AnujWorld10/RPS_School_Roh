@@ -10,7 +10,7 @@ export function LoadingState({ label = 'Loading' }: { label?: string }) {
       className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center"
       role="status"
     >
-      <LoaderCircle aria-hidden="true" className="size-5 animate-spin text-indigo-600" />
+      <LoaderCircle aria-hidden="true" className="size-5 animate-spin text-primary" />
       <p className="text-sm text-slate-600">{label}</p>
     </div>
   )

@@ -270,6 +270,33 @@ class PublicAdmissionSummary(BaseModel):
     documents_required: int = Field(
         default=6, description="Number of required admission documents."
     )
+    documents: list["PublicAdmissionDocumentSummary"] = Field(
+        default_factory=list,
+        description="Document verification states; never includes file paths.",
+    )
+    student_code: str | None = Field(
+        default=None,
+        description="Assigned school student ID, available after enrollment.",
+    )
+    student_name: str | None = Field(
+        default=None,
+        description="Enrolled student name, available after enrollment.",
+    )
+    class_name: str | None = Field(default=None, description="Enrolled class name.")
+    section: str | None = Field(default=None, description="Enrolled class section.")
+    academic_year: str | None = Field(default=None, description="Admission academic year.")
+    roll_number: int | None = Field(default=None, description="Assigned class roll number.")
+
+
+class PublicAdmissionDocumentSummary(BaseModel):
+    """Safe document progress shown to the verified parent."""
+
+    document_type: str
+    verification_status: str
+    rejection_reason: str | None = None
+
+
+PublicAdmissionSummary.model_rebuild()
 
 
 class PublicInquiryStatusResponse(BaseModel):

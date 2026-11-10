@@ -125,7 +125,7 @@ function TeacherFormDialog({
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       ) : null}
-      <form className="grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit((values) => {
+      <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={form.handleSubmit((values) => {
         setFormError(null)
         mutation.mutate(values)
       })}>

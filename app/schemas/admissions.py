@@ -1,6 +1,7 @@
 """Pydantic schemas for inquiry-linked admission and documents."""
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -23,6 +24,27 @@ class InquiryAdmissionCreateRequest(BaseModel):
     permanent_address: str | None = Field(
         default=None,
         description="Applicant's permanent residential address.",
+    )
+    student_aadhaar: str | None = Field(
+        default=None,
+        description="Student Aadhaar number; encrypted at rest and never returned by the API.",
+    )
+    parent_aadhaar: str | None = Field(
+        default=None,
+        description=(
+            "Parent/guardian Aadhaar number; encrypted at rest and never returned by the API."
+        ),
+    )
+    last_school_marks: Decimal | None = Field(
+        default=None, ge=0, le=999999.99, description="Marks obtained at the previous school."
+    )
+    last_school_percentage: Decimal | None = Field(
+        default=None, ge=0, le=100, description="Previous-school percentage, from 0 to 100."
+    )
+    last_school_id_or_roll_number: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Student ID or roll number from the previous school.",
     )
     temporary_address: str | None = Field(
         default=None,
@@ -55,6 +77,7 @@ class InquiryAdmissionCreateRequest(BaseModel):
         "section",
         "academic_year",
         "permanent_address",
+        "last_school_id_or_roll_number",
         "temporary_address",
         "nationality",
         "disability",
@@ -66,6 +89,39 @@ class InquiryAdmissionCreateRequest(BaseModel):
     @classmethod
     def strip_form_strings(cls, value: str | None) -> str | None:
         return value.strip() if isinstance(value, str) else value
+
+
+class PublicInquiryAdmissionCreateRequest(InquiryAdmissionCreateRequest):
+    """Public admission form fields that must be supplied by the parent."""
+
+    student_aadhaar: str = Field(
+        ...,
+        min_length=12,
+        max_length=12,
+        pattern=r"^[0-9]{12}$",
+        description="Student Aadhaar number; encrypted at rest and never returned by the API.",
+    )
+    parent_aadhaar: str = Field(
+        ...,
+        min_length=12,
+        max_length=12,
+        pattern=r"^[0-9]{12}$",
+        description=(
+            "Parent/guardian Aadhaar number; encrypted at rest and never returned by the API."
+        ),
+    )
+    last_school_marks: Decimal = Field(
+        ..., ge=0, le=999999.99, description="Marks obtained at the previous school."
+    )
+    last_school_percentage: Decimal = Field(
+        ..., ge=0, le=100, description="Previous-school percentage, from 0 to 100."
+    )
+    last_school_id_or_roll_number: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Student ID or roll number from the previous school.",
+    )
 
 
 class InquiryAdmissionUpdateRequest(BaseModel):
@@ -114,14 +170,11 @@ class AdmissionDocumentResponse(ORMModel):
         ...,
         description=(
             "Document category: progress_report, transfer_certificate, migration_certificate, "
-            "character_certificate, student_aadhar, or parent_aadhar."
+            "character_certificate, student_aadhar (student Aadhaar), or "
+            "parent_aadhar (parent Aadhaar)."
         ),
     )
     file_name: str = Field(..., description="Uploaded file name.")
-    file_path: str = Field(
-        ...,
-        description="Stored file location or download path.",
-    )
     verification_status: str = Field(
         ..., description="Verification state: PENDING, VERIFIED, or REJECTED."
     )
@@ -135,6 +188,15 @@ class AdmissionDocumentResponse(ORMModel):
     )
 
 
+class PublicAdmissionDocumentUploadResponse(BaseModel):
+    """Safe upload confirmation returned to the parent."""
+
+    document_type: str
+    verification_status: str
+    rejection_reason: str | None = None
+    verified_at: datetime | None = None
+
+
 class InquiryAdmissionResponse(ORMModel):
     """Full admission application for staff APIs."""
 
@@ -146,6 +208,7 @@ class InquiryAdmissionResponse(ORMModel):
     )
     inquiry_id: int = Field(..., description="ID of the originating inquiry.")
     class_id: int = Field(..., description="Target class catalog ID.", examples=[1])
+    class_name: str | None = Field(default=None, description="Target class name.")
     section: str | None = Field(..., description="Assigned or requested section.")
     academic_year: str = Field(
         ..., description="Academic year for admission.", examples=["2026-2027"]
@@ -160,6 +223,21 @@ class InquiryAdmissionResponse(ORMModel):
     permanent_address: str | None = Field(
         ...,
         description="Permanent residential address, if provided.",
+    )
+    student_aadhaar_masked: str | None = Field(
+        default=None, description="Masked student Aadhaar number; full value is never returned."
+    )
+    parent_aadhaar_masked: str | None = Field(
+        default=None, description="Masked parent Aadhaar number; full value is never returned."
+    )
+    last_school_marks: Decimal | None = Field(
+        default=None, description="Marks obtained at the previous school."
+    )
+    last_school_percentage: Decimal | None = Field(
+        default=None, description="Previous-school percentage."
+    )
+    last_school_id_or_roll_number: str | None = Field(
+        default=None, description="Student ID or roll number from the previous school."
     )
     temporary_address: str | None = Field(
         ..., description="Temporary/current address, if provided."
@@ -258,9 +336,10 @@ class RequiredDocumentsResponse(BaseModel):
     """Checklist of required document types."""
 
     required: list[str] = Field(
-        default_factory=lambda: sorted(DocumentType),
+        default_factory=lambda: sorted(document_type.value for document_type in DocumentType),
         description=(
             "Required document categories: progress_report, transfer_certificate, "
-            "migration_certificate, character_certificate, student_aadhar, and parent_aadhar."
+            "migration_certificate, character_certificate, student_aadhar, and parent_aadhar "
+            "(student and parent Aadhaar documents)."
         ),
     )

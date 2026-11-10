@@ -29,6 +29,40 @@ def test_public_create_inquiry(client):
     assert data["status"] == "PENDING"
 
 
+def test_public_admission_classes_include_only_active_parent_facing_options(client, db_session):
+    from app.models.class_model import Class
+
+    active_class = Class(
+        name="Public Grade 11",
+        section="A",
+        academic_year="2027-2028",
+        capacity=30,
+        status="active",
+    )
+    inactive_class = Class(
+        name="Closed Grade 11",
+        section=None,
+        academic_year="2027-2028",
+        capacity=30,
+        status="inactive",
+    )
+    db_session.add_all([active_class, inactive_class])
+    db_session.commit()
+
+    response = client.get("/api/v1/public/student/classes")
+
+    assert response.status_code == 200
+    classes = response.json()["data"]
+    assert {
+        "id": active_class.id,
+        "name": "Public Grade 11",
+        "section": "A",
+        "academic_year": "2027-2028",
+    } in classes
+    assert all(item["name"] != "Closed Grade 11" for item in classes)
+    assert set(classes[0]) == {"id", "name", "section", "academic_year"}
+
+
 def test_public_status_check(client):
     """GET status by inquiry_code returns timeline after create."""
     create_resp = client.post("/api/v1/public/student/inquiry", json=INQUIRY_PAYLOAD)

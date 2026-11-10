@@ -10,6 +10,7 @@ os.environ["APP_ENV"] = "test"
 # Keep test database and bootstrap credentials independent of local environment settings.
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-32chars-min"
+os.environ["ADMISSION_PII_ENCRYPTION_KEY"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 os.environ["DEBUG"] = "true"
 os.environ["INITIAL_ADMIN_EMAIL"] = "test-admin@school.com"
 os.environ["INITIAL_ADMIN_PASSWORD"] = "TestAdmin@123"

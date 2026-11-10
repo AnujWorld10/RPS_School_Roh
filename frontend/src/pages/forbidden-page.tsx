@@ -16,7 +16,7 @@ export function ForbiddenPage() {
           this is incorrect, contact a system administrator.
         </AlertDescription>
       </Alert>
-      <Button className="mt-5" onClick={() => navigate('/')} variant="outline">
+      <Button className="mt-5" onClick={() => navigate('/dashboard')} variant="outline">
         Return to dashboard
       </Button>
     </>

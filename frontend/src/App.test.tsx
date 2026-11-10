@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ErrorState, LoadingState } from './components/ui/async-state'
 import App from './App'
-import { AppProviders } from './providers'
 import { AuthContext, type AuthContextValue } from './features/auth/auth-context'
 import { ConfirmDialog } from './components/ui/confirm-dialog'
 
@@ -26,7 +25,7 @@ const adminPermissions = [
 
 function renderAuthenticatedApp(
   permissions: string[] = adminPermissions,
-  initialPath = '/',
+  initialPath = '/dashboard',
 ) {
   const authValue: AuthContextValue = {
     user: {
@@ -59,12 +58,35 @@ function renderAuthenticatedApp(
   )
 }
 
-describe('application layout', () => {
-  it('renders the dashboard shell without claiming to load school data', () => {
-    renderAuthenticatedApp()
+function renderUnauthenticatedApp(initialPath = '/') {
+  const authValue: AuthContextValue = {
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    isLoggingIn: false,
+    isLoggingOut: false,
+    sessionExpired: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  }
 
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
-    expect(screen.getByText(/No school data is loaded in this phase/)).toBeInTheDocument()
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <AuthContext.Provider value={authValue}>
+          <App />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+describe('application layout', () => {
+  it('renders the dashboard shell without loading metrics without read permissions', async () => {
+    renderAuthenticatedApp([], '/dashboard')
+
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByText(/does not have permission to read the school or admissions summary APIs/)).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
   })
 
@@ -72,9 +94,9 @@ describe('application layout', () => {
     const user = userEvent.setup()
     renderAuthenticatedApp()
 
-    await user.click(screen.getAllByRole('link', { name: 'Teachers' })[0])
+    await user.click((await screen.findAllByRole('link', { name: 'Teachers' }))[0])
 
-    expect(screen.getByRole('heading', { name: 'Teachers' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Teachers' })).toBeInTheDocument()
     expect(screen.getByText(/Manage teacher profiles, employment status/)).toBeInTheDocument()
   })
 
@@ -82,11 +104,11 @@ describe('application layout', () => {
     const user = userEvent.setup()
     renderAuthenticatedApp()
 
-    await user.click(screen.getByRole('button', { name: 'Open navigation' }))
+    await user.click(await screen.findByRole('button', { name: 'Open navigation' }))
     const mobileMenu = screen.getByRole('dialog', { name: 'Main navigation' })
     await user.click(within(mobileMenu).getByRole('link', { name: 'Students' }))
 
-    expect(screen.getByRole('heading', { name: 'Students' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Students' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Main navigation' })).not.toBeInTheDocument()
   })
 
@@ -94,7 +116,7 @@ describe('application layout', () => {
     const user = userEvent.setup()
     renderAuthenticatedApp()
 
-    await user.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
+    await user.click(await screen.findByRole('button', { name: 'Toggle sidebar' }))
 
     expect(screen.getByRole('link', { name: 'Students' })).toHaveAttribute('title', 'Students')
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
@@ -104,40 +126,44 @@ describe('application layout', () => {
     const user = userEvent.setup()
     renderAuthenticatedApp()
 
-    await user.click(screen.getByRole('button', { name: 'Open account menu' }))
+    await user.click(await screen.findByRole('button', { name: 'Open account menu' }))
 
-    expect(await screen.findByText('test-admin@example.invalid')).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+    expect(await screen.findByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+    expect(screen.getByText('test-admin@example.invalid')).toBeInTheDocument()
   })
 
-  it('hides unauthorized navigation and blocks a direct route', () => {
+  it('hides unauthorized navigation and does not expose unfinished module routes', async () => {
     renderAuthenticatedApp(['students.read'], '/salary')
 
     expect(screen.queryByRole('link', { name: 'Salary payments' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Access restricted' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
   })
 })
 
 describe('authentication routing', () => {
-  it('redirects an unauthenticated visitor to the real sign-in form', async () => {
-    render(
-      <AppProviders>
-        <App />
-      </AppProviders>,
-    )
+  it('opens the public school homepage for an unauthenticated visitor at the home URL', async () => {
+    renderUnauthenticatedApp()
+
+    expect(await screen.findByRole('heading', { name: 'Welcome to RPS School' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'A pathway for every stage' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Stay informed' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Life at RPS' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Start an inquiry' })[0]).toHaveAttribute('href', '/apply')
+  })
+
+  it('places the public admission portal link at the top of the staff sign-in page', async () => {
+    renderUnauthenticatedApp('/login')
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open the public admission portal' })).toHaveAttribute('href', '/apply')
     expect(screen.getByLabelText('Email')).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'School website' })).toBeInTheDocument()
   })
 
   it('validates required login fields before making a request', async () => {
     const user = userEvent.setup()
-    render(
-      <AppProviders>
-        <App />
-      </AppProviders>,
-    )
+    renderUnauthenticatedApp('/login')
     await screen.findByRole('heading', { name: 'Sign in' })
 
     await user.click(screen.getByRole('button', { name: 'Sign in' }))
@@ -166,6 +192,25 @@ describe('shared UI states', () => {
     expect(await screen.findByText('The operation was rejected.')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Confirm deletion' })).toBeInTheDocument()
     expect(onConfirm).toHaveBeenCalledOnce()
+  })
+
+  it('lets the user cancel a confirmation without running the action', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    render(
+      <ConfirmDialog
+        description="Delete this record?"
+        onConfirm={onConfirm}
+        title="Confirm deletion"
+        trigger={<button type="button">Delete record</button>}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Delete record' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Confirm deletion' })).not.toBeInTheDocument()
+    expect(onConfirm).not.toHaveBeenCalled()
   })
 
   it('announces loading content to assistive technology', () => {

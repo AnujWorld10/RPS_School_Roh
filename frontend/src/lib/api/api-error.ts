@@ -31,10 +31,22 @@ export class ApiError extends Error {
   }
 }
 
+function formatFieldErrors(errors?: ApiFieldError[], baseMessage?: string) {
+  const details = errors
+    ?.map(({ field, message }) => {
+      const fieldName = field?.replace(/^(body|query|path|header)\./, '')
+      return fieldName ? `${fieldName}: ${message}` : message
+    })
+    .filter((detail) => detail !== baseMessage)
+    .join('; ')
+  return details ? `${baseMessage ?? 'The request failed.'}: ${details}` : baseMessage
+}
+
 export function unwrapEnvelope<T>(envelope: ApiEnvelope<T>): T {
   if (!envelope.success) {
     const firstError = envelope.errors?.[0]
-    throw new ApiError(envelope.message || firstError?.message || 'The request failed.', {
+    const baseMessage = envelope.message || firstError?.message || 'The request failed.'
+    throw new ApiError(formatFieldErrors(envelope.errors, baseMessage) ?? baseMessage, {
       code: firstError?.code,
       errors: envelope.errors,
       requestId: envelope.meta?.request_id,
@@ -52,10 +64,11 @@ export function toApiError(error: unknown): ApiError {
   if (axios.isAxiosError<ErrorEnvelope>(error)) {
     const body = error.response?.data
     const firstError = body?.errors?.[0]
-    const message = body?.message
+    const baseMessage = body?.message
       ?? (error.response
         ? `The request failed with status ${error.response.status}.`
         : 'Unable to reach the school management API. Check the API URL and connection.')
+    const message = formatFieldErrors(body?.errors, baseMessage) ?? baseMessage
 
     return new ApiError(message, {
       status: error.response?.status,

@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import { useId } from 'react'
+import { cloneElement, isValidElement, type ReactNode, useId } from 'react'
 
 type FormFieldProps = {
   label: string
@@ -20,6 +19,10 @@ export function FormField({
   const descriptionId = description ? `${id}-description` : undefined
   const errorId = error ? `${id}-error` : undefined
   const describedBy = [descriptionId, errorId].filter(Boolean).join(' ') || undefined
+  const control = children({ id, describedBy })
+  const accessibleControl = isValidElement<{ 'aria-invalid'?: boolean }>(control)
+    ? cloneElement(control, { 'aria-invalid': Boolean(error) })
+    : control
 
   return (
     <div className="grid gap-2">
@@ -27,7 +30,7 @@ export function FormField({
         {label}
         {required ? <span className="ml-1 text-rose-600" aria-label="required">*</span> : null}
       </label>
-      {children({ id, describedBy })}
+      {accessibleControl}
       {description ? (
         <p className="text-xs leading-5 text-slate-500" id={descriptionId}>
           {description}

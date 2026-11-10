@@ -4,10 +4,13 @@ Admission APIs: inquiry-driven flow (phase 2) and legacy student-based routes.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permissions
+from app.core.config import get_settings
+from app.core.exceptions import NotFoundException
 from app.core.pagination import PaginationParams, pagination_params
 from app.core.responses import paginated_response, success_response
 from app.db.session import get_db
@@ -25,6 +28,7 @@ from app.schemas.common import RejectionRequest
 from app.services.admissions import AdmissionService
 from app.services.enrollment import EnrollmentService
 from app.services.inquiry_admissions import InquiryAdmissionService
+from app.utils.admission_pii import masked_aadhaar
 
 router = APIRouter()
 
@@ -36,6 +40,9 @@ def _admission_response(admission) -> dict:
         AdmissionDocumentResponse.model_validate(d).model_dump()
         for d in getattr(admission, "documents", [])
     ]
+    data["student_aadhaar_masked"] = masked_aadhaar(admission.student_aadhaar_last4)
+    data["parent_aadhaar_masked"] = masked_aadhaar(admission.parent_aadhaar_last4)
+    data["class_name"] = admission.school_class.name if admission.school_class else None
     return data
 
 
@@ -128,34 +135,6 @@ def update_inquiry_admission(
     )
 
 
-@router.post("/inquiry-admissions/{admission_id}/documents")
-def upload_admission_document(
-    admission_id: int,
-    request: Request,
-    db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_permissions("admissions.update"))],
-    document_type: Annotated[
-        str,
-        Form(
-            description=(
-                "Document category: progress_report, transfer_certificate, "
-                "migration_certificate, character_certificate, student_aadhar, or parent_aadhar."
-            )
-        ),
-    ],
-    file: Annotated[
-        UploadFile,
-        File(description="Document file to upload (PDF, JPG, JPEG, or PNG)."),
-    ],
-):
-    doc = InquiryAdmissionService(db).upload_document(admission_id, document_type, file, request)
-    return success_response(
-        "Document uploaded successfully",
-        AdmissionDocumentResponse.model_validate(doc).model_dump(),
-        request,
-    )
-
-
 @router.post("/documents/{document_id}/verify")
 def verify_document(
     document_id: int,
@@ -179,6 +158,39 @@ def verify_document(
         "Document verification updated",
         AdmissionDocumentResponse.model_validate(doc).model_dump(),
         request,
+    )
+
+
+@router.get(
+    "/documents/{document_id}/file",
+    summary="View an uploaded admission document",
+)
+def view_admission_document(
+    document_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(require_permissions("admissions.read"))],
+):
+    document = InquiryAdmissionService(db).documents.get_by_id(document_id)
+    if not document:
+        raise NotFoundException("Admission document not found")
+    upload_root = get_settings().upload_path.resolve()
+    file_path = (upload_root / document.file_path).resolve()
+    if not file_path.is_relative_to(upload_root) or not file_path.is_file():
+        raise NotFoundException("Admission document file not found")
+    media_type = {
+        ".pdf": "application/pdf",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+    }.get(file_path.suffix.lower(), "application/octet-stream")
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

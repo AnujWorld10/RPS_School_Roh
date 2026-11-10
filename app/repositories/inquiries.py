@@ -53,6 +53,8 @@ class StudentInquiryRepository(BaseRepository[StudentInquiry]):
                 selectinload(StudentInquiry.admission).selectinload(
                     InquiryAdmission.documents  # type: ignore[name-defined]
                 ),
+                selectinload(StudentInquiry.admission).selectinload(InquiryAdmission.student),
+                selectinload(StudentInquiry.admission).selectinload(InquiryAdmission.school_class),
             )
         )
         return self.session.scalar(stmt)

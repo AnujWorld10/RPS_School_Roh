@@ -57,11 +57,7 @@ class StudentRepository(BaseRepository[Student]):
             .where(Student.deleted_at.is_(None))
             .options(selectinload(Student.current_class))
         )
-        ownership = (
-            self._ownership_filter(user, role_codes or set())
-            if user is not None
-            else None
-        )
+        ownership = self._ownership_filter(user, role_codes or set()) if user is not None else None
         if ownership is not None:
             stmt = stmt.where(ownership)
         if status:
@@ -79,15 +75,23 @@ class StudentRepository(BaseRepository[Student]):
             )
         return self.paginate(stmt, params)
 
-    @staticmethod
-    def _ownership_filter(user: User, role_codes: set[str]):
+    def _ownership_filter(self, user: User, role_codes: set[str]):
         scoped_roles = {"STUDENT", "PARENT"}
         if not role_codes.intersection(scoped_roles):
             return None
 
         filters = []
         if "STUDENT" in role_codes:
-            filters.append(Student.email == user.email)
+            linked_student_id = self.session.scalar(
+                select(Student.id)
+                .where(Student.user_id == user.id)
+                .limit(1)
+            )
+            filters.append(
+                Student.user_id == user.id
+                if linked_student_id is not None
+                else Student.email == user.email
+            )
 
         if "PARENT" in role_codes and user.phone:
             filters.append(

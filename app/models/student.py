@@ -3,6 +3,7 @@ ORM model for enrolled students (post-admission).
 """
 
 from datetime import date
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Date, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -10,17 +11,23 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import BIGINT_PK, Base, SoftDeleteMixin, TimestampMixin
 from app.models.enums import StudentStatus
 
+if TYPE_CHECKING:
+    from app.models.admission import InquiryAdmission, StudentAdmission
+    from app.models.class_model import Class
+    from app.models.user import User
+
 
 class Student(Base, TimestampMixin, SoftDeleteMixin):
     """
     Enrolled student record created from a successful admission.
 
-    ``student_code`` (e.g. STU202600001) and ``roll_number`` are assigned at enrollment.
+    ``student_code`` (e.g. RPS00001) and ``roll_number`` are assigned at enrollment.
     """
 
     __tablename__ = "students"
     __table_args__ = (
         UniqueConstraint("student_code", name="uq_student_code"),
+        UniqueConstraint("user_id", name="uq_students_user_id"),
         UniqueConstraint(
             "class_id",
             "academic_year",
@@ -39,7 +46,7 @@ class Student(Base, TimestampMixin, SoftDeleteMixin):
     student_code: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
-        comment="Business ID e.g. STU202600001",
+        comment="School-wide business ID e.g. RPS00001",
     )
     inquiry_id: Mapped[int | None] = mapped_column(
         BigInteger,
@@ -47,6 +54,12 @@ class Student(Base, TimestampMixin, SoftDeleteMixin):
         nullable=True,
         unique=True,
         comment="Originating inquiry if applicable",
+    )
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Optional one-to-one student portal account",
     )
     admission_no: Mapped[str | None] = mapped_column(
         String(50),
@@ -99,6 +112,7 @@ class Student(Base, TimestampMixin, SoftDeleteMixin):
         back_populates="student",
         uselist=False,
     )
+    portal_user: Mapped["User | None"] = relationship()
     legacy_admissions: Mapped[list["StudentAdmission"]] = relationship(  # noqa: F821
         back_populates="student",
     )

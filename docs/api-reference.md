@@ -4,9 +4,52 @@
 
 The OpenAPI schema at `/openapi.json` and interactive `/docs` are the runtime contract. This file provides a browsable snapshot of every operation, its parameters, request and response schemas, and the field constraints exposed by OpenAPI. The shared response envelopes and route permissions are documented in [the technical guide](technical-documentation.md#8-authentication--authorization).
 
-**Operations:** 76
+**Operations:** 122
 
 ## Operations
+
+### `GET /api/v1/public/student/classes`
+
+List classes available for public admission applications
+
+**Group:** `public`
+
+**OpenAPI authentication:** Not specified by OpenAPI
+
+**Authorization requirement:** Public route; no bearer token dependency declared.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Available admission classes fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
 
 ### `POST /api/v1/public/student/inquiry`
 
@@ -134,7 +177,20 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
       "admission_code": "ADM202600055",
       "status": "submitted",
       "documents_uploaded": 0,
-      "documents_required": 6
+      "documents_required": 6,
+      "documents": [
+        {
+          "document_type": "Example document type",
+          "verification_status": "Example verification status",
+          "rejection_reason": "Required admission document is missing."
+        }
+      ],
+      "student_code": "STU202600001",
+      "student_name": "Example student name",
+      "class_name": "Example class name",
+      "section": "A",
+      "academic_year": "2026-2027",
+      "roll_number": 1
     }
   },
   "meta": {
@@ -229,7 +285,20 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
       "admission_code": "ADM202600055",
       "status": "submitted",
       "documents_uploaded": 0,
-      "documents_required": 6
+      "documents_required": 6,
+      "documents": [
+        {
+          "document_type": "Example document type",
+          "verification_status": "Example verification status",
+          "rejection_reason": "Required admission document is missing."
+        }
+      ],
+      "student_code": "STU202600001",
+      "student_name": "Example student name",
+      "class_name": "Example class name",
+      "section": "A",
+      "academic_year": "2026-2027",
+      "roll_number": 1
     }
   },
   "meta": {
@@ -293,6 +362,1102 @@ HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 | HTTP status | Description | Response schema |
 |---:|---|---|
 | `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/public/student/admission/documents`
+
+Upload an admission document as the verified parent
+
+**Group:** `public`
+
+**OpenAPI authentication:** Not specified by OpenAPI
+
+**Authorization requirement:** Public route; no bearer token dependency declared.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `multipart/form-data`: [`Body_upload_public_admission_document_api_v1_public_student_admission_documents_post`](#body_upload_public_admission_document_api_v1_public_student_admission_documents_post)
+
+For multipart requests, send the listed fields as form parts. The `file` part must contain the selected local file, not a JSON-encoded path.
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Admission document uploaded successfully",
+  "data": {
+    "document_type": "Example document type",
+    "verification_status": "Example verification status",
+    "rejection_reason": "Required admission document is missing.",
+    "verified_at": "2026-10-20T10:00:00Z"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/public/student/inquiry/status/{inquiry_code}/admission-letter`
+
+Download the admission letter after enrollment
+
+**Group:** `public`
+
+**OpenAPI authentication:** Not specified by OpenAPI
+
+**Authorization requirement:** Public route; no bearer token dependency declared.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `inquiry_code` | path | Yes | string | — |
+| `X-Parent-Email` | header | Yes | string (email) | — |
+| `X-Parent-Mobile` | header | Yes | string | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+This endpoint returns a binary PDF file; no JSON success envelope is returned.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Parent-verified PDF admission letter. | `application/pdf`: string (binary) |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/public/events`
+
+List Public Events
+
+**Group:** `public`, `public`
+
+**OpenAPI authentication:** Not specified by OpenAPI
+
+**Authorization requirement:** Public route; no bearer token dependency declared.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+
+### `GET /api/v1/teachers/me/class-subjects`
+
+List My Teaching Assignments
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `teaching_assignments.manage`.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+
+### `POST /api/v1/teachers/me/class-subjects`
+
+Add My Teaching Assignment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `teaching_assignments.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | query | Yes | integer | Numeric database ID of the class. |
+| `subject_id` | query | Yes | integer | Numeric database ID of the subject. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `DELETE /api/v1/teachers/me/class-subjects/{class_id}/{subject_id}`
+
+Remove My Teaching Assignment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `teaching_assignments.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/assignments`
+
+List Assignments
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | query | No | anyOf: integer, null | Numeric database ID of the class. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/assignments`
+
+Create Assignment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.create`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`AssignmentCreateRequest`](#assignmentcreaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "title": "Example title",
+  "details": "Example details",
+  "class_id": 1,
+  "subject_id": 1,
+  "teacher_id": 1,
+  "assigned_date": "2026-10-20",
+  "due_date": "2026-10-20"
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/assignments/{assignment_id}`
+
+Get Assignment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assignment_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/assignments/{assignment_id}`
+
+Update Assignment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assignment_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`AssignmentUpdateRequest`](#assignmentupdaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "title": "Example title",
+  "details": "Example details",
+  "due_date": "2026-10-20"
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/assignments/{assignment_id}/publish`
+
+Publish Assignment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.publish`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assignment_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/assignments/{assignment_id}/close`
+
+Close Assignment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assignment_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/assignments/{assignment_id}/attachments`
+
+Upload Assignment Attachment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assignment_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `multipart/form-data`: [`Body_upload_assignment_attachment_api_v1_assignments__assignment_id__attachments_post`](#body_upload_assignment_attachment_api_v1_assignments__assignment_id__attachments_post)
+
+For multipart requests, send the listed fields as form parts. The `file` part must contain the selected local file, not a JSON-encoded path.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/assignments/{assignment_id}/attachments/{attachment_id}`
+
+Download Assignment Attachment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assignments.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assignment_id` | path | Yes | integer | — |
+| `attachment_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/timetable`
+
+List Timetable
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `timetable.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | query | No | anyOf: integer, null | Numeric database ID of the class. |
+| `academic_year` | query | No | anyOf: string, null | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/timetable`
+
+Create Timetable Entry
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `timetable.create`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`TimetableCreateRequest`](#timetablecreaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "class_id": 1,
+  "subject_id": 1,
+  "teacher_id": 1,
+  "day_of_week": 1,
+  "start_time": "10:30:00",
+  "end_time": "10:30:00",
+  "room": "Example room",
+  "academic_year": "2026-2027"
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/timetable/{entry_id}`
+
+Update Timetable Entry
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `timetable.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `entry_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`TimetableUpdateRequest`](#timetableupdaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "class_id": 1,
+  "subject_id": 1,
+  "teacher_id": 1,
+  "day_of_week": 1,
+  "start_time": "10:30:00",
+  "end_time": "10:30:00",
+  "room": "Example room",
+  "academic_year": "2026-2027"
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/assessments`
+
+List Assessments
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assessments.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | query | No | anyOf: integer, null | Numeric database ID of the class. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/assessments`
+
+Create Assessment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assessments.create`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`AssessmentCreateRequest`](#assessmentcreaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "name": "Grade 5",
+  "assessment_type": "unit_test",
+  "class_id": 1,
+  "subject_id": 1,
+  "teacher_id": 1,
+  "assessment_date": "2026-10-20",
+  "max_score": 1.0
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/assessments/{assessment_id}`
+
+Get Assessment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assessments.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assessment_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/assessments/{assessment_id}`
+
+Update Assessment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assessments.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assessment_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`AssessmentUpdateRequest`](#assessmentupdaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "name": "Grade 5",
+  "assessment_type": "unit_test",
+  "assessment_date": "2026-10-20",
+  "max_score": 1.0
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/assessments/{assessment_id}/results/{student_id}`
+
+Upsert Assessment Result
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assessments.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assessment_id` | path | Yes | integer | — |
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`AssessmentResultRequest`](#assessmentresultrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "score": 1.0,
+  "result_status": "present",
+  "remarks": "Please bring the previous report card."
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/assessments/{assessment_id}/publish`
+
+Publish Assessment
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `assessments.publish`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `assessment_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/events`
+
+List Events
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `events.read`.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+
+### `POST /api/v1/events`
+
+Create Event
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `events.create`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`EventCreateRequest`](#eventcreaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "title": "Example title",
+  "description": "Example description",
+  "starts_at": "2026-10-20T10:00:00Z",
+  "ends_at": "2026-10-20T10:00:00Z",
+  "venue": "Example venue",
+  "audience": "public"
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/events/{event_id}`
+
+Update Event
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `events.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `event_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`EventUpdateRequest`](#eventupdaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "title": "Example title",
+  "description": "Example description",
+  "starts_at": "2026-10-20T10:00:00Z",
+  "ends_at": "2026-10-20T10:00:00Z",
+  "venue": "Example venue",
+  "audience": "public"
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/events/{event_id}/review`
+
+Review Event
+
+**Group:** `role portals`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `events.review`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `event_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`EventReviewRequest`](#eventreviewrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "status": "published",
+  "rejection_reason": "Required admission document is missing."
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/auth/student/register`
+
+Register Student Portal
+
+**Group:** `auth`
+
+**OpenAPI authentication:** Not specified by OpenAPI
+
+**Authorization requirement:** Public route; no bearer token dependency declared.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`StudentPortalRegistrationRequest`](#studentportalregistrationrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "admission_id": "EXAMPLE-CODE",
+  "email": "parent@example.com",
+  "password": "ExamplePassword!2026",
+  "confirm_password": "Example confirm password"
+}
+```
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Student portal account created. You can now sign in with your student ID.",
+  "data": {
+    "student_id": 1,
+    "email": "parent@example.com"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/auth/student/login`
+
+Login Student Portal
+
+**Group:** `auth`
+
+**OpenAPI authentication:** Not specified by OpenAPI
+
+**Authorization requirement:** Public route; no bearer token dependency declared.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`StudentPortalLoginRequest`](#studentportalloginrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "student_id": 1,
+  "password": "ExamplePassword!2026"
+}
+```
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "access_token": "example-access-token-not-valid",
+    "refresh_token": "example-refresh-token-not-valid",
+    "token_type": "bearer",
+    "expires_in": 1
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
 | `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
 
 **Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
@@ -383,7 +1548,8 @@ Required: Yes
 ```json
 {
   "email": "parent@example.com",
-  "password": "ExamplePassword!2026"
+  "password": "ExamplePassword!2026",
+  "portal": "student"
 }
 ```
 
@@ -1304,6 +2470,1137 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 
 **Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
 
+### `GET /api/v1/dashboard/summary`
+
+Get permission-filtered dashboard metrics
+
+**Group:** `dashboard`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires at least one of these permissions: `students.read`, `teachers.read`, `classes.read`, `subjects.read`, `inquiries.read`, `admissions.read`, `interviews.read`.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Dashboard summary fetched successfully",
+  "data": {
+    "school_timezone": "Asia/Kolkata",
+    "student_count": 1,
+    "teacher_count": 1,
+    "class_count": 1,
+    "subject_count": 1,
+    "inquiry_count": 1,
+    "pending_admission_count": 1,
+    "admissions_by_status": {
+      "draft": 1,
+      "submitted": 1,
+      "document_pending": 1,
+      "document_verification": 1,
+      "approved": 1,
+      "rejected": 1
+    },
+    "upcoming_interview_count": 1,
+    "upcoming_interviews": [
+      {
+        "id": 1,
+        "inquiry_code": "INQ202600007",
+        "student_name": "Example student name",
+        "schedule_date": "2026-11-05",
+        "schedule_time": "10:30:00",
+        "location": "Room 101",
+        "mode": "OFFLINE"
+      }
+    ],
+    "MonthlyFeeStructureResponse": {
+      "components": [
+        {
+          "id": 1,
+          "fee_name": "Tuition",
+          "amount": 100.0,
+          "billing_frequency": "MONTHLY",
+          "is_optional": false,
+          "description": null,
+          "created_at": "2026-10-20T10:00:00Z"
+        },
+        {
+          "id": 2,
+          "fee_name": "Activity",
+          "amount": 500.0,
+          "billing_frequency": "ONE_TIME",
+          "is_optional": true,
+          "description": null,
+          "created_at": "2026-10-20T10:00:00Z"
+        }
+      ],
+      "mandatory_annual_total": 1200.0,
+      "optional_annual_total": 500.0,
+      "mandatory_monthly_equivalent": 100.0,
+      "optional_monthly_equivalent": 41.67,
+      "total_annual_amount": 1700.0
+    }
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: [`DashboardSummaryEnvelope`](#dashboardsummaryenvelope) |
+
+### `POST /api/v1/fees/admission-structures`
+
+Create an admission fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.create`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`AdmissionFeeStructureCreate`](#admissionfeestructurecreate)
+
+**Illustrative JSON request**
+
+```json
+{
+  "academic_year": "2026-2027",
+  "class_id": 1,
+  "structure_name": "Example structure name",
+  "description": "Example description",
+  "is_active": true,
+  "components": [
+    {
+      "fee_name": "Example fee name",
+      "amount": 1.0,
+      "is_refundable": false,
+      "is_optional": false,
+      "description": "Example description"
+    }
+  ]
+}
+```
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Admission fee structure created successfully.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Registration",
+        "amount": 100.0,
+        "is_refundable": false,
+        "is_optional": false,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      },
+      {
+        "id": 2,
+        "fee_name": "Uniform",
+        "amount": 20.0,
+        "is_refundable": false,
+        "is_optional": true,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z",
+    "mandatory_total": 100.0,
+    "optional_total": 20.0,
+    "total_amount": 120.0
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/fees/admission-structures`
+
+List admission fee structures
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | query | No | anyOf: integer, null | Filter by class ID. |
+| `academic_year` | query | No | anyOf: string, null | Filter by class academic year. |
+| `is_active` | query | No | anyOf: boolean, null | Filter by active status. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Records fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "academic_year": "2026-2027",
+      "class_id": 1,
+      "school_class": {
+        "id": 1,
+        "name": "Grade 5",
+        "section": "A",
+        "academic_year": "2026-2027"
+      },
+      "structure_name": "Example structure name",
+      "description": "Example description",
+      "is_active": true,
+      "components": [
+        {
+          "id": 1,
+          "fee_name": "Registration",
+          "amount": 100.0,
+          "is_refundable": false,
+          "is_optional": false,
+          "description": null,
+          "created_at": "2026-10-20T10:00:00Z"
+        },
+        {
+          "id": 2,
+          "fee_name": "Uniform",
+          "amount": 20.0,
+          "is_refundable": false,
+          "is_optional": true,
+          "description": null,
+          "created_at": "2026-10-20T10:00:00Z"
+        }
+      ],
+      "created_at": "2026-10-20T10:00:00Z",
+      "updated_at": "2026-10-20T10:00:00Z",
+      "mandatory_total": 100.0,
+      "optional_total": 20.0,
+      "total_amount": 120.0
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  },
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total_records": 1,
+    "total_pages": 1
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/fees/admission-structures/{structure_id}`
+
+Get an admission fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Admission fee structure fetched successfully.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Registration",
+        "amount": 100.0,
+        "is_refundable": false,
+        "is_optional": false,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      },
+      {
+        "id": 2,
+        "fee_name": "Uniform",
+        "amount": 20.0,
+        "is_refundable": false,
+        "is_optional": true,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z",
+    "mandatory_total": 100.0,
+    "optional_total": 20.0,
+    "total_amount": 120.0
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/fees/admission-structures/{structure_id}`
+
+Update an admission fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`AdmissionFeeStructureUpdate`](#admissionfeestructureupdate)
+
+**Illustrative JSON request**
+
+```json
+{
+  "academic_year": "2026-2027",
+  "class_id": 1,
+  "structure_name": "Example structure name",
+  "description": "Example description",
+  "is_active": true,
+  "components": [
+    {
+      "id": 1,
+      "fee_name": "Example fee name",
+      "amount": 1.0,
+      "is_refundable": true,
+      "is_optional": true,
+      "description": "Example description"
+    }
+  ]
+}
+```
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Admission fee structure updated successfully.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Registration",
+        "amount": 100.0,
+        "is_refundable": false,
+        "is_optional": false,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      },
+      {
+        "id": 2,
+        "fee_name": "Uniform",
+        "amount": 20.0,
+        "is_refundable": false,
+        "is_optional": true,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z",
+    "mandatory_total": 100.0,
+    "optional_total": 20.0,
+    "total_amount": 120.0
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `DELETE /api/v1/fees/admission-structures/{structure_id}`
+
+Deactivate an admission fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.delete`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Admission fee structure deactivated.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Registration",
+        "amount": 100.0,
+        "is_refundable": false,
+        "is_optional": false,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      },
+      {
+        "id": 2,
+        "fee_name": "Uniform",
+        "amount": 20.0,
+        "is_refundable": false,
+        "is_optional": true,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z",
+    "mandatory_total": 100.0,
+    "optional_total": 20.0,
+    "total_amount": 120.0
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PATCH /api/v1/fees/admission-structures/{structure_id}/status`
+
+Change an admission fee structure's active status
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`FeeStructureStatusUpdate`](#feestructurestatusupdate)
+
+**Illustrative JSON request**
+
+```json
+{
+  "is_active": true
+}
+```
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Admission fee structure status updated.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Registration",
+        "amount": 100.0,
+        "is_refundable": false,
+        "is_optional": false,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      },
+      {
+        "id": 2,
+        "fee_name": "Uniform",
+        "amount": 20.0,
+        "is_refundable": false,
+        "is_optional": true,
+        "description": null,
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z",
+    "mandatory_total": 100.0,
+    "optional_total": 20.0,
+    "total_amount": 120.0
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/fees/monthly-structures`
+
+Create a monthly fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.create`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`MonthlyFeeStructureCreate`](#monthlyfeestructurecreate)
+
+**Illustrative JSON request**
+
+```json
+{
+  "academic_year": "2026-2027",
+  "class_id": 1,
+  "structure_name": "Example structure name",
+  "description": "Example description",
+  "is_active": true,
+  "components": [
+    {
+      "fee_name": "Example fee name",
+      "amount": 1.0,
+      "billing_frequency": "MONTHLY",
+      "is_optional": false,
+      "description": "Example description"
+    }
+  ]
+}
+```
+
+**Illustrative success response**
+
+HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Monthly fee structure created successfully.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Example fee name",
+        "amount": 1.0,
+        "billing_frequency": "MONTHLY",
+        "is_optional": true,
+        "description": "Example description",
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/fees/monthly-structures`
+
+List monthly fee structures
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | query | No | anyOf: integer, null | Filter by class ID. |
+| `academic_year` | query | No | anyOf: string, null | Filter by class academic year. |
+| `is_active` | query | No | anyOf: boolean, null | Filter by active status. |
+| `page` | query | No | integer | 1-based page number to return. |
+| `limit` | query | No | integer | Number of records per page, from 1 to 100. |
+| `sort_by` | query | No | string | Field used to sort results; supported fields depend on the endpoint. |
+| `sort_order` | query | No | string; Allowed values: `asc, desc` | Sort direction: asc or desc. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Records fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "academic_year": "2026-2027",
+      "class_id": 1,
+      "school_class": {
+        "id": 1,
+        "name": "Grade 5",
+        "section": "A",
+        "academic_year": "2026-2027"
+      },
+      "structure_name": "Example structure name",
+      "description": "Example description",
+      "is_active": true,
+      "components": [
+        {
+          "id": 1,
+          "fee_name": "Example fee name",
+          "amount": 1.0,
+          "billing_frequency": "MONTHLY",
+          "is_optional": true,
+          "description": "Example description",
+          "created_at": "2026-10-20T10:00:00Z"
+        }
+      ],
+      "created_at": "2026-10-20T10:00:00Z",
+      "updated_at": "2026-10-20T10:00:00Z"
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  },
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total_records": 1,
+    "total_pages": 1
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/fees/monthly-structures/{structure_id}`
+
+Get a monthly fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Monthly fee structure fetched successfully.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Example fee name",
+        "amount": 1.0,
+        "billing_frequency": "MONTHLY",
+        "is_optional": true,
+        "description": "Example description",
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/fees/monthly-structures/{structure_id}`
+
+Update a monthly fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`MonthlyFeeStructureUpdate`](#monthlyfeestructureupdate)
+
+**Illustrative JSON request**
+
+```json
+{
+  "academic_year": "2026-2027",
+  "class_id": 1,
+  "structure_name": "Example structure name",
+  "description": "Example description",
+  "is_active": true,
+  "components": [
+    {
+      "id": 1,
+      "fee_name": "Example fee name",
+      "amount": 1.0,
+      "billing_frequency": "MONTHLY",
+      "is_optional": true,
+      "description": "Example description"
+    }
+  ]
+}
+```
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Monthly fee structure updated successfully.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Example fee name",
+        "amount": 1.0,
+        "billing_frequency": "MONTHLY",
+        "is_optional": true,
+        "description": "Example description",
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `DELETE /api/v1/fees/monthly-structures/{structure_id}`
+
+Deactivate a monthly fee structure
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.delete`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Monthly fee structure deactivated.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Example fee name",
+        "amount": 1.0,
+        "billing_frequency": "MONTHLY",
+        "is_optional": true,
+        "description": "Example description",
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PATCH /api/v1/fees/monthly-structures/{structure_id}/status`
+
+Change a monthly fee structure's active status
+
+**Group:** `fees`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `fees.update`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `structure_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`FeeStructureStatusUpdate`](#feestructurestatusupdate)
+
+**Illustrative JSON request**
+
+```json
+{
+  "is_active": true
+}
+```
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Monthly fee structure status updated.",
+  "data": {
+    "id": 1,
+    "academic_year": "2026-2027",
+    "class_id": 1,
+    "school_class": {
+      "id": 1,
+      "name": "Grade 5",
+      "section": "A",
+      "academic_year": "2026-2027"
+    },
+    "structure_name": "Example structure name",
+    "description": "Example description",
+    "is_active": true,
+    "components": [
+      {
+        "id": 1,
+        "fee_name": "Example fee name",
+        "amount": 1.0,
+        "billing_frequency": "MONTHLY",
+        "is_optional": true,
+        "description": "Example description",
+        "created_at": "2026-10-20T10:00:00Z"
+      }
+    ],
+    "created_at": "2026-10-20T10:00:00Z",
+    "updated_at": "2026-10-20T10:00:00Z"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
 ### `GET /api/v1/inquiries`
 
 List Inquiries
@@ -2025,6 +4322,194 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 | HTTP status | Description | Response schema |
 |---:|---|---|
 | `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/students/me`
+
+Get My Student Profile
+
+**Group:** `students`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires one of these roles: `STUDENT`.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Student profile fetched successfully",
+  "data": {
+    "student_id": 1,
+    "admission_id": "EXAMPLE-CODE",
+    "first_name": "Aarav",
+    "middle_name": null,
+    "last_name": "Sharma",
+    "father_name": "Rohit Sharma",
+    "mother_name": "Example mother name",
+    "date_of_birth": "2018-04-12",
+    "gender": "male",
+    "class_name": "Example class name",
+    "section": "A",
+    "academic_year": "2026-2027",
+    "email": "parent@example.com",
+    "phone": "+919876543211",
+    "address": "12 School Road, Pune",
+    "admission_date": "2026-10-20T10:00:00Z",
+    "student_photo_url": "Example student photo url",
+    "status": "active"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+
+### `GET /api/v1/students/me/fees`
+
+Get My Student Fee Details
+
+**Group:** `students`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires one of these roles: `STUDENT`.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Student fee schedules fetched successfully",
+  "data": {
+    "student_id": 1,
+    "class_id": 1,
+    "academic_year": "2026-2027",
+    "admission_fee_structure": {
+      "id": 1,
+      "academic_year": "2026-2027",
+      "class_id": 1,
+      "school_class": {
+        "id": 1,
+        "name": "Grade 5",
+        "section": "A",
+        "academic_year": "2026-2027"
+      },
+      "structure_name": "Example structure name",
+      "description": "Example description",
+      "is_active": true,
+      "components": [
+        {
+          "id": 1,
+          "fee_name": "Example fee name",
+          "amount": 1.0,
+          "is_refundable": true,
+          "is_optional": true,
+          "description": "Example description",
+          "created_at": "2026-10-20T10:00:00Z"
+        }
+      ],
+      "created_at": "2026-10-20T10:00:00Z",
+      "updated_at": "2026-10-20T10:00:00Z"
+    },
+    "monthly_fee_structure": {
+      "id": 1,
+      "academic_year": "2026-2027",
+      "class_id": 1,
+      "school_class": {
+        "id": 1,
+        "name": "Grade 5",
+        "section": "A",
+        "academic_year": "2026-2027"
+      },
+      "structure_name": "Example structure name",
+      "description": "Example description",
+      "is_active": true,
+      "components": [
+        {
+          "id": 1,
+          "fee_name": "Example fee name",
+          "amount": 1.0,
+          "billing_frequency": "MONTHLY",
+          "is_optional": true,
+          "description": "Example description",
+          "created_at": "2026-10-20T10:00:00Z"
+        }
+      ],
+      "created_at": "2026-10-20T10:00:00Z",
+      "updated_at": "2026-10-20T10:00:00Z"
+    },
+    "payment_records_available": false,
+    "paid_amount": 1.0,
+    "pending_amount": 1.0,
+    "upcoming_due_date": "2026-10-20",
+    "payment_status": "Example payment status",
+    "billing_message": "Example billing message"
+  },
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+
+### `GET /api/v1/students/me/fees/monthly/pdf`
+
+Download My Monthly Fee Pdf
+
+**Group:** `students`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires one of these roles: `STUDENT`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `month` | query | Yes | integer | — |
+| `year` | query | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | — |
+| `501` | Fee invoices and payment records are not configured. | — |
 | `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
 
 **Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
@@ -2873,10 +5358,16 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
       "admission_code": "ADM202600055",
       "inquiry_id": 1,
       "class_id": 1,
+      "class_name": "Example class name",
       "section": "A",
       "academic_year": "2026-2027",
       "status": "submitted",
       "permanent_address": "12 School Road, Pune",
+      "student_aadhaar_masked": "Example student aadhaar masked",
+      "parent_aadhaar_masked": "Example parent aadhaar masked",
+      "last_school_marks": 1.0,
+      "last_school_percentage": 87.5,
+      "last_school_id_or_roll_number": "Example last school id or roll number",
       "temporary_address": "12 School Road, Pune",
       "nationality": "Indian",
       "disability": "Requires wheelchair access",
@@ -2939,6 +5430,11 @@ Required: Yes
   "section": "A",
   "academic_year": "2026-2027",
   "permanent_address": "12 School Road, Pune",
+  "student_aadhaar": "Example student aadhaar",
+  "parent_aadhaar": "Example parent aadhaar",
+  "last_school_marks": 1.0,
+  "last_school_percentage": 87.5,
+  "last_school_id_or_roll_number": "Example last school id or roll number",
   "temporary_address": "12 School Road, Pune",
   "nationality": "Indian",
   "disability": "Requires wheelchair access",
@@ -2961,10 +5457,16 @@ HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "admission_code": "ADM202600055",
     "inquiry_id": 1,
     "class_id": 1,
+    "class_name": "Example class name",
     "section": "A",
     "academic_year": "2026-2027",
     "status": "submitted",
     "permanent_address": "12 School Road, Pune",
+    "student_aadhaar_masked": "Example student aadhaar masked",
+    "parent_aadhaar_masked": "Example parent aadhaar masked",
+    "last_school_marks": 1.0,
+    "last_school_percentage": 87.5,
+    "last_school_id_or_roll_number": "Example last school id or roll number",
     "temporary_address": "12 School Road, Pune",
     "nationality": "Indian",
     "disability": "Requires wheelchair access",
@@ -3022,10 +5524,16 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "admission_code": "ADM202600055",
     "inquiry_id": 1,
     "class_id": 1,
+    "class_name": "Example class name",
     "section": "A",
     "academic_year": "2026-2027",
     "status": "submitted",
     "permanent_address": "12 School Road, Pune",
+    "student_aadhaar_masked": "Example student aadhaar masked",
+    "parent_aadhaar_masked": "Example parent aadhaar masked",
+    "last_school_marks": 1.0,
+    "last_school_percentage": 87.5,
+    "last_school_id_or_roll_number": "Example last school id or roll number",
     "temporary_address": "12 School Road, Pune",
     "nationality": "Indian",
     "disability": "Requires wheelchair access",
@@ -3103,10 +5611,16 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "admission_code": "ADM202600055",
     "inquiry_id": 1,
     "class_id": 1,
+    "class_name": "Example class name",
     "section": "A",
     "academic_year": "2026-2027",
     "status": "submitted",
     "permanent_address": "12 School Road, Pune",
+    "student_aadhaar_masked": "Example student aadhaar masked",
+    "parent_aadhaar_masked": "Example parent aadhaar masked",
+    "last_school_marks": 1.0,
+    "last_school_percentage": 87.5,
+    "last_school_id_or_roll_number": "Example last school id or roll number",
     "temporary_address": "12 School Road, Pune",
     "nationality": "Indian",
     "disability": "Requires wheelchair access",
@@ -3116,63 +5630,6 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "notes": "Applicant will provide the original documents at the office.",
     "student_id": 1,
     "documents": []
-  },
-  "meta": {
-    "request_id": "example-request-id",
-    "timestamp": "2026-10-20T10:00:00Z"
-  }
-}
-```
-
-**Responses**
-
-| HTTP status | Description | Response schema |
-|---:|---|---|
-| `200` | Successful Response | `application/json`: object |
-| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
-
-**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
-
-### `POST /api/v1/inquiry-admissions/{admission_id}/documents`
-
-Upload Admission Document
-
-**Group:** `admissions`
-
-**OpenAPI authentication:** `HTTPBearer`
-
-**Authorization requirement:** Requires permission `admissions.update`.
-
-**Parameters**
-
-| Name | Location | Required | Type and constraints | Description |
-|---|---|---:|---|---|
-| `admission_id` | path | Yes | integer | — |
-
-**Request body**
-
-Required: Yes
-- `multipart/form-data`: [`Body_upload_admission_document_api_v1_inquiry_admissions__admission_id__documents_post`](#body_upload_admission_document_api_v1_inquiry_admissions__admission_id__documents_post)
-
-For multipart requests, send the listed fields as form parts. The `file` part must contain the selected local file, not a JSON-encoded path.
-
-**Illustrative success response**
-
-HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
-
-```json
-{
-  "success": true,
-  "message": "Document uploaded successfully",
-  "data": {
-    "id": 1,
-    "admission_id": 1,
-    "document_type": "progress_report",
-    "file_name": "progress-report.pdf",
-    "file_path": "uploads/admissions/1/progress-report.pdf",
-    "verification_status": "PENDING",
-    "rejection_reason": "Required admission document is missing.",
-    "verified_at": "2026-10-20T10:00:00Z"
   },
   "meta": {
     "request_id": "example-request-id",
@@ -3233,7 +5690,6 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "admission_id": 1,
     "document_type": "progress_report",
     "file_name": "progress-report.pdf",
-    "file_path": "uploads/admissions/1/progress-report.pdf",
     "verification_status": "PENDING",
     "rejection_reason": "Required admission document is missing.",
     "verified_at": "2026-10-20T10:00:00Z"
@@ -3244,6 +5700,37 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   }
 }
 ```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/documents/{document_id}/file`
+
+View an uploaded admission document
+
+**Group:** `admissions`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `admissions.read`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `document_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
 
 **Responses**
 
@@ -3330,10 +5817,16 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "admission_code": "ADM202600055",
     "inquiry_id": 1,
     "class_id": 1,
+    "class_name": "Example class name",
     "section": "A",
     "academic_year": "2026-2027",
     "status": "submitted",
     "permanent_address": "12 School Road, Pune",
+    "student_aadhaar_masked": "Example student aadhaar masked",
+    "parent_aadhaar_masked": "Example parent aadhaar masked",
+    "last_school_marks": 1.0,
+    "last_school_percentage": 87.5,
+    "last_school_id_or_roll_number": "Example last school id or roll number",
     "temporary_address": "12 School Road, Pune",
     "nationality": "Indian",
     "disability": "Requires wheelchair access",
@@ -3402,10 +5895,16 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "admission_code": "ADM202600055",
     "inquiry_id": 1,
     "class_id": 1,
+    "class_name": "Example class name",
     "section": "A",
     "academic_year": "2026-2027",
     "status": "submitted",
     "permanent_address": "12 School Road, Pune",
+    "student_aadhaar_masked": "Example student aadhaar masked",
+    "parent_aadhaar_masked": "Example parent aadhaar masked",
+    "last_school_marks": 1.0,
+    "last_school_percentage": 87.5,
+    "last_school_id_or_roll_number": "Example last school id or roll number",
     "temporary_address": "12 School Road, Pune",
     "nationality": "Indian",
     "disability": "Requires wheelchair access",
@@ -3462,7 +5961,7 @@ HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the toke
     "student_id": 1,
     "student_code": "STU202600001",
     "admission_id": 1,
-    "admission_code": "ADM202600055",
+    "admission_code": "RPS00001",
     "inquiry_code": "INQ202600007",
     "class_id": 1,
     "section": "A",
@@ -4680,6 +7179,98 @@ Staff-only field updates (including internal notes and class mapping).
 | `admission_for_class_id` | anyOf: integer, null | No | — | Catalog class ID to associate with this inquiry.; Example: `1` |
 | `internal_notes` | anyOf: string, null | No | — | Staff-only notes; not visible in parent status responses. |
 
+### `AdmissionFeeComponentCreate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `fee_name` | string | Yes | Min length: `1`; Max length: `100` | Unique charge name. |
+| `amount` | anyOf: number, string | Yes | — | Non-negative amount with a maximum of two decimal places. |
+| `is_refundable` | boolean | No | Default: `False` | Whether this charge is refundable. |
+| `is_optional` | boolean | No | Default: `False` | Whether families may opt out. |
+| `description` | anyOf: string, null | No | — | — |
+
+### `AdmissionFeeComponentUpdate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `id` | anyOf: integer, null | No | — | Existing component ID; omit to add a component. |
+| `fee_name` | anyOf: string, null | No | — | — |
+| `amount` | anyOf: number, string, null | No | — | — |
+| `is_refundable` | anyOf: boolean, null | No | — | — |
+| `is_optional` | anyOf: boolean, null | No | — | — |
+| `description` | anyOf: string, null | No | — | — |
+
+### `AdmissionFeeStructureCreate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `academic_year` | string | Yes | Min length: `4`; Max length: `20` | —; Example: `2026-2027` |
+| `class_id` | integer | Yes | — | Existing class in the selected academic year. |
+| `structure_name` | string | Yes | Min length: `1`; Max length: `100` | — |
+| `description` | anyOf: string, null | No | — | — |
+| `is_active` | boolean | No | Default: `True` | — |
+| `components` | array of [`AdmissionFeeComponentCreate`](#admissionfeecomponentcreate) | Yes | Min items: `1` | — |
+
+### `AdmissionFeeStructureUpdate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `academic_year` | anyOf: string, null | No | — | — |
+| `class_id` | anyOf: integer, null | No | — | — |
+| `structure_name` | anyOf: string, null | No | — | — |
+| `description` | anyOf: string, null | No | — | — |
+| `is_active` | anyOf: boolean, null | No | — | — |
+| `components` | anyOf: array of [`AdmissionFeeComponentUpdate`](#admissionfeecomponentupdate), null | No | — | — |
+
+### `AssessmentCreateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `name` | string | Yes | Min length: `1`; Max length: `200` | — |
+| `assessment_type` | string | Yes | Allowed values: `unit_test, periodic_test, mid_term, final_exam, assignment, quiz, practical, oral` | — |
+| `class_id` | integer | Yes | — | — |
+| `subject_id` | integer | Yes | — | — |
+| `teacher_id` | anyOf: integer, null | No | — | — |
+| `assessment_date` | string (date) | Yes | — | — |
+| `max_score` | anyOf: number, string | Yes | — | — |
+
+### `AssessmentResultRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `score` | anyOf: number, string, null | No | — | — |
+| `result_status` | string | No | Allowed values: `present, absent`; Default: `present` | — |
+| `remarks` | anyOf: string, null | No | — | — |
+
+### `AssessmentUpdateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `name` | anyOf: string, null | No | — | — |
+| `assessment_type` | anyOf: string, null | No | — | — |
+| `assessment_date` | anyOf: string (date), null | No | — | — |
+| `max_score` | anyOf: number, string, null | No | — | — |
+
+### `AssignmentCreateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `title` | string | Yes | Min length: `1`; Max length: `200` | — |
+| `details` | string | Yes | Min length: `1`; Max length: `10000` | — |
+| `class_id` | integer | Yes | — | — |
+| `subject_id` | integer | Yes | — | — |
+| `teacher_id` | anyOf: integer, null | No | — | — |
+| `assigned_date` | anyOf: string (date), null | No | — | — |
+| `due_date` | string (date) | Yes | — | — |
+
+### `AssignmentUpdateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `title` | anyOf: string, null | No | — | — |
+| `details` | anyOf: string, null | No | — | — |
+| `due_date` | anyOf: string (date), null | No | — | — |
+
 ### `AttendanceCreateRequest`
 
 | Property | Type | Required | Constraints | Description |
@@ -4692,6 +7283,12 @@ Staff-only field updates (including internal notes and class mapping).
 
 **Allowed values:** `present`, `absent`, `leave`, `half_day`
 
+### `BillingFrequency`
+
+Frequency used to bill a recurring fee component.
+
+**Allowed values:** `MONTHLY`, `QUARTERLY`, `ANNUALLY`, `ONE_TIME`
+
 ### `Body_submit_admission_api_v1_public_student_admission_post`
 
 | Property | Type | Required | Constraints | Description |
@@ -4701,15 +7298,29 @@ Staff-only field updates (including internal notes and class mapping).
 | `parent_mobile` | string | Yes | Min length: `5`; Max length: `30` | Parent/guardian mobile number supplied with the original inquiry. |
 | `class_id` | integer | Yes | — | Catalog ID of the class requested for admission.; Example: `1` |
 | `academic_year` | string | Yes | Min length: `4`; Max length: `20` | Academic year for admission.; Example: `2026-2027` |
+| `student_aadhaar` | string | No | Default: `` | 12-digit student Aadhaar number. |
+| `parent_aadhaar` | string | No | Default: `` | 12-digit parent/guardian Aadhaar number. |
+| `last_school_marks` | string | No | Default: `` | Marks obtained at the previous school. |
+| `last_school_percentage` | string | No | Default: `` | Percentage obtained at the previous school. |
+| `last_school_id_or_roll_number` | string | No | Default: `` | Previous-school student ID or roll number. |
 | `section` | anyOf: string, null | No | — | Optional section within the selected class. |
 | `permanent_address` | anyOf: string, null | No | — | Optional permanent residential address. |
 
-### `Body_upload_admission_document_api_v1_inquiry_admissions__admission_id__documents_post`
+### `Body_upload_assignment_attachment_api_v1_assignments__assignment_id__attachments_post`
 
 | Property | Type | Required | Constraints | Description |
 |---|---|---:|---|---|
-| `document_type` | string | Yes | — | Document category: progress_report, transfer_certificate, migration_certificate, character_certificate, student_aadhar, or parent_aadhar. |
-| `file` | string | Yes | — | Document file to upload (PDF, JPG, JPEG, or PNG). |
+| `file` | string | Yes | — | PDF, JPG, JPEG, or PNG attachment. |
+
+### `Body_upload_public_admission_document_api_v1_public_student_admission_documents_post`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `inquiry_code` | string | Yes | Min length: `5`; Max length: `20` | — |
+| `email` | string (email) | Yes | — | — |
+| `parent_mobile` | string | Yes | Min length: `5`; Max length: `30` | — |
+| `document_type` | string | Yes | — | — |
+| `file` | string | Yes | — | — |
 
 ### `ChangePasswordRequest`
 
@@ -4761,6 +7372,32 @@ Whether a school class record is open for admissions.
 | `capacity` | anyOf: integer, null | No | — | Updated maximum student count. |
 | `status` | anyOf: [`ClassStatus`](#classstatus), null | No | — | Class state: active or inactive. |
 
+### `DashboardSummaryEnvelope`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `success` | boolean | Yes | — | — |
+| `message` | string | Yes | — | — |
+| `data` | [`DashboardSummaryResponse`](#dashboardsummaryresponse) | Yes | — | — |
+| `meta` | [`ResponseMeta`](#responsemeta) | Yes | — | — |
+
+### `DashboardSummaryResponse`
+
+Permission-filtered live dashboard metrics; null fields are not authorized.
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `school_timezone` | string | Yes | — | IANA timezone used for interview scheduling. |
+| `student_count` | anyOf: integer, null | No | — | Visible student count. |
+| `teacher_count` | anyOf: integer, null | No | — | Teacher count. |
+| `class_count` | anyOf: integer, null | No | — | Non-deleted class count. |
+| `subject_count` | anyOf: integer, null | No | — | Subject catalog count. |
+| `inquiry_count` | anyOf: integer, null | No | — | Inquiry count. |
+| `pending_admission_count` | anyOf: integer, null | No | — | Applications in draft, submitted, document_pending, or document_verification. |
+| `admissions_by_status` | anyOf: object, null | No | — | Inquiry-linked admission application counts grouped by workflow status. |
+| `upcoming_interview_count` | anyOf: integer, null | No | — | Scheduled interviews from the current school-local time onward. |
+| `upcoming_interviews` | anyOf: array of [`UpcomingInterviewSummaryItem`](#upcominginterviewsummaryitem), null | No | — | Up to five upcoming interviews; included only with inquiries.read. |
+
 ### `DocumentVerifyRequest`
 
 Staff verification of a single document.
@@ -4768,6 +7405,41 @@ Staff verification of a single document.
 | Property | Type | Required | Constraints | Description |
 |---|---|---:|---|---|
 | `rejection_reason` | anyOf: string, null | No | — | Reason for rejecting the document; required when verification status is set to REJECTED. |
+
+### `EventCreateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `title` | string | Yes | Min length: `1`; Max length: `200` | — |
+| `description` | string | Yes | Min length: `1`; Max length: `10000` | — |
+| `starts_at` | string (date-time) | Yes | — | — |
+| `ends_at` | string (date-time) | Yes | — | — |
+| `venue` | anyOf: string, null | No | — | — |
+| `audience` | string | No | Allowed values: `public, students, parents, all`; Default: `all` | — |
+
+### `EventReviewRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `status` | string | Yes | Allowed values: `published, rejected` | — |
+| `rejection_reason` | anyOf: string, null | No | — | — |
+
+### `EventUpdateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `title` | anyOf: string, null | No | — | — |
+| `description` | anyOf: string, null | No | — | — |
+| `starts_at` | anyOf: string (date-time), null | No | — | — |
+| `ends_at` | anyOf: string (date-time), null | No | — | — |
+| `venue` | anyOf: string, null | No | — | — |
+| `audience` | anyOf: string, null | No | — | — |
+
+### `FeeStructureStatusUpdate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `is_active` | boolean | Yes | — | Whether the fee structure is active. |
 
 ### `Gender`
 
@@ -4791,6 +7463,11 @@ Submit admission application after interview pass (staff or verified parent).
 | `section` | anyOf: string, null | No | — | Requested class section. |
 | `academic_year` | string | Yes | Min length: `4`; Max length: `20` | Academic year for admission.; Example: `2026-2027` |
 | `permanent_address` | anyOf: string, null | No | — | Applicant's permanent residential address. |
+| `student_aadhaar` | anyOf: string, null | No | — | Student Aadhaar number; encrypted at rest and never returned by the API. |
+| `parent_aadhaar` | anyOf: string, null | No | — | Parent/guardian Aadhaar number; encrypted at rest and never returned by the API. |
+| `last_school_marks` | anyOf: number, string, null | No | — | Marks obtained at the previous school. |
+| `last_school_percentage` | anyOf: number, string, null | No | — | Previous-school percentage, from 0 to 100. |
+| `last_school_id_or_roll_number` | anyOf: string, null | No | — | Student ID or roll number from the previous school. |
 | `temporary_address` | anyOf: string, null | No | — | Applicant's current address if different. |
 | `nationality` | anyOf: string, null | No | — | Applicant's nationality. |
 | `disability` | anyOf: string, null | No | — | Disability information relevant to school support, if any.; Example: `Requires wheelchair access` |
@@ -4871,12 +7548,56 @@ Record pass, fail, or absent for a scheduled interview.
 |---|---|---:|---|---|
 | `email` | string | Yes | — | Email address registered to the account. |
 | `password` | string | Yes | — | Account password. |
+| `portal` | anyOf: string, null | No | — | Optional portal role required for this sign-in. |
 
 ### `LogoutRequest`
 
 | Property | Type | Required | Constraints | Description |
 |---|---|---:|---|---|
 | `refresh_token` | string | Yes | — | Refresh token to revoke. |
+
+### `MonthlyFeeComponentCreate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `fee_name` | string | Yes | Min length: `1`; Max length: `100` | Unique charge name. |
+| `amount` | anyOf: number, string | Yes | — | Non-negative amount with a maximum of two decimal places. |
+| `billing_frequency` | [`BillingFrequency`](#billingfrequency) | Yes | — | — |
+| `is_optional` | boolean | No | Default: `False` | Whether families may opt out. |
+| `description` | anyOf: string, null | No | — | — |
+
+### `MonthlyFeeComponentUpdate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `id` | anyOf: integer, null | No | — | Existing component ID; omit to add a component. |
+| `fee_name` | anyOf: string, null | No | — | — |
+| `amount` | anyOf: number, string, null | No | — | — |
+| `billing_frequency` | anyOf: [`BillingFrequency`](#billingfrequency), null | No | — | — |
+| `is_optional` | anyOf: boolean, null | No | — | — |
+| `description` | anyOf: string, null | No | — | — |
+
+### `MonthlyFeeStructureCreate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `academic_year` | string | Yes | Min length: `4`; Max length: `20` | —; Example: `2026-2027` |
+| `class_id` | integer | Yes | — | Existing class in the selected academic year. |
+| `structure_name` | string | Yes | Min length: `1`; Max length: `100` | — |
+| `description` | anyOf: string, null | No | — | — |
+| `is_active` | boolean | No | Default: `True` | — |
+| `components` | array of [`MonthlyFeeComponentCreate`](#monthlyfeecomponentcreate) | Yes | Min items: `1` | — |
+
+### `MonthlyFeeStructureUpdate`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `academic_year` | anyOf: string, null | No | — | — |
+| `class_id` | anyOf: integer, null | No | — | — |
+| `structure_name` | anyOf: string, null | No | — | — |
+| `description` | anyOf: string, null | No | — | — |
+| `is_active` | anyOf: boolean, null | No | — | — |
+| `components` | anyOf: array of [`MonthlyFeeComponentUpdate`](#monthlyfeecomponentupdate), null | No | — | — |
 
 ### `PaymentStatus`
 
@@ -4940,6 +7661,13 @@ Parent must prove ownership via inquiry_code + email + parent_mobile.
 |---|---|---:|---|---|
 | `rejection_reason` | string | Yes | Min length: `1` | Explanation shown for the rejection. |
 
+### `ResponseMeta`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `request_id` | string | Yes | — | — |
+| `timestamp` | string | Yes | — | — |
+
 ### `SalaryPaymentCreateRequest`
 
 | Property | Type | Required | Constraints | Description |
@@ -4977,6 +7705,22 @@ Parent must prove ownership via inquiry_code + email + parent_mobile.
 | `email` | anyOf: string (email), null | No | — | Optional student or guardian email address. |
 | `phone` | anyOf: string, null | No | — | Optional student or guardian phone number. |
 | `current_class_id` | anyOf: integer, null | No | — | Optional ID of the student's current class.; Example: `1` |
+
+### `StudentPortalLoginRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `student_id` | string | Yes | Min length: `1`; Max length: `50` | — |
+| `password` | string | Yes | Min length: `1`; Max length: `128` | — |
+
+### `StudentPortalRegistrationRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `admission_id` | string | Yes | Min length: `1`; Max length: `50` | — |
+| `email` | string | Yes | — | — |
+| `password` | string | Yes | Min length: `8`; Max length: `128` | — |
+| `confirm_password` | string | Yes | Min length: `8`; Max length: `128` | — |
 
 ### `StudentUpdateRequest`
 
@@ -5042,6 +7786,46 @@ Parent must prove ownership via inquiry_code + email + parent_mobile.
 | `email` | anyOf: string (email), null | No | — | Updated work email address. |
 | `phone` | anyOf: string, null | No | — | Updated contact phone number. |
 | `status` | anyOf: [`TeacherStatus`](#teacherstatus), null | No | — | Employment status: active, inactive, or resigned. |
+
+### `TimetableCreateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | integer | Yes | — | — |
+| `subject_id` | integer | Yes | — | — |
+| `teacher_id` | anyOf: integer, null | No | — | — |
+| `day_of_week` | integer | Yes | Minimum: `0.0`; Maximum: `6.0` | — |
+| `start_time` | string (time) | Yes | — | — |
+| `end_time` | string (time) | Yes | — | — |
+| `room` | anyOf: string, null | No | — | — |
+| `academic_year` | string | Yes | Min length: `1`; Max length: `20` | — |
+
+### `TimetableUpdateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | anyOf: integer, null | No | — | — |
+| `subject_id` | anyOf: integer, null | No | — | — |
+| `teacher_id` | anyOf: integer, null | No | — | — |
+| `day_of_week` | anyOf: integer, null | No | — | — |
+| `start_time` | anyOf: string (time), null | No | — | — |
+| `end_time` | anyOf: string (time), null | No | — | — |
+| `room` | anyOf: string, null | No | — | — |
+| `academic_year` | anyOf: string, null | No | — | — |
+
+### `UpcomingInterviewSummaryItem`
+
+A limited, applicant-safe dashboard preview of a scheduled interview.
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `id` | integer | Yes | — | Interview schedule ID. |
+| `inquiry_code` | string | Yes | — | Inquiry code associated with the interview. |
+| `student_name` | string | Yes | — | Applicant name; returned only with inquiries.read. |
+| `schedule_date` | string (date) | Yes | — | School-local interview date. |
+| `schedule_time` | string (time) | Yes | — | School-local interview start time. |
+| `location` | string | Yes | — | Interview location or meeting details. |
+| `mode` | string | Yes | — | Interview mode: ONLINE or OFFLINE. |
 
 ### `UserRegisterRequest`
 

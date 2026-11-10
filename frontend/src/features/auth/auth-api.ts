@@ -1,10 +1,25 @@
-import { requestData } from '@/lib/api/api-client'
+import { requestData, requestPublicData } from '@/lib/api/api-client'
 import { ApiError } from '@/lib/api/api-error'
 import type { SessionTokens } from '@/lib/api/token-store'
 
 export type LoginCredentials = {
+  password: string
+  portal?: 'student' | 'parent' | 'teacher' | 'administration'
+} & (
+  | { email: string; student_id?: never }
+  | { student_id: string; email?: never }
+)
+
+export type StudentPortalRegistration = {
+  admission_id: string
   email: string
   password: string
+  confirm_password: string
+}
+
+export type StudentPortalRegistrationResult = {
+  student_id: string
+  email: string
 }
 
 export type LoginTokenResponse = {
@@ -26,10 +41,13 @@ export type AuthenticatedUser = {
 }
 
 export async function loginRequest(credentials: LoginCredentials): Promise<SessionTokens> {
+  const isStudentIDLogin = 'student_id' in credentials
   const result = await requestData<LoginTokenResponse>({
     method: 'POST',
-    url: '/auth/login',
-    data: credentials,
+    url: isStudentIDLogin ? '/auth/student/login' : '/auth/login',
+    data: isStudentIDLogin
+      ? { student_id: credentials.student_id, password: credentials.password }
+      : credentials,
     skipAuthRefresh: true,
   })
 
@@ -45,6 +63,14 @@ export async function loginRequest(credentials: LoginCredentials): Promise<Sessi
   }
 
   return { accessToken: result.access_token, refreshToken: result.refresh_token }
+}
+
+export function registerStudentPortal(payload: StudentPortalRegistration) {
+  return requestPublicData<StudentPortalRegistrationResult>({
+    method: 'POST',
+    url: '/auth/student/register',
+    data: payload,
+  })
 }
 
 export function currentUserRequest() {

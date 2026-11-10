@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import { LoadingState } from '@/components/ui/async-state'
 import { cn } from '@/lib/utils'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
@@ -8,10 +9,10 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
+    <div className="min-h-screen bg-background text-foreground">
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-20 hidden border-r border-slate-200 bg-white transition-[width] duration-200 lg:block',
+          'fixed inset-y-0 left-0 z-20 hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl shadow-slate-950/10 transition-[width] duration-200 lg:block',
           collapsed ? 'w-[76px]' : 'w-[260px]',
         )}
       >
@@ -22,10 +23,12 @@ export function AppShell() {
           <Topbar onToggleSidebar={() => setCollapsed((value) => !value)} />
           <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
             <div className="mx-auto w-full max-w-[1440px]">
-              <Outlet />
+              <Suspense fallback={<LoadingState label="Loading page" />}>
+                <Outlet />
+              </Suspense>
             </div>
           </main>
-          <footer className="border-t border-slate-200 bg-white px-4 py-4 text-center text-xs text-slate-500 sm:px-6 lg:px-8">
+          <footer className="border-t border-border/80 bg-white/80 px-4 py-4 text-center text-xs text-muted-foreground sm:px-6 lg:px-8">
             RPS School Management <span aria-hidden="true">·</span> Frontend foundation
           </footer>
         </div>

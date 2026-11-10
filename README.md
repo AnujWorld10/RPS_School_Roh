@@ -92,8 +92,8 @@ database and upload behavior in the target environment as well.
 ## Frontend
 
 The React application lives in `frontend/` and is a standalone Vite project. It uses the
-backend bearer-token authentication API and supports teacher, class, subject, and student
-management workflows.
+backend bearer-token authentication API and supports teacher, class, subject, student,
+inquiry, interview, admission, and admission-document workflows.
 
 Install Node.js LTS, then from the repository root:
 
@@ -123,11 +123,25 @@ requires signing in again. The school modules load and update records through th
 - Subjects: search, paginate, create, edit, activate, and deactivate catalog subjects.
 - Students: search, paginate, filter by status/class, view profiles and class subjects, edit
   profiles, assign enrollment, update supported status transitions, and soft-delete.
+- Inquiries: submit public intake, search and filter staff inquiries, review/status transitions,
+  internal notes, class mapping, and start an admission after an interview pass.
+- Interviews: schedule and record results from an inquiry's interview history. The backend
+  has no global interview list, so an inquiry must be selected first.
+- Admissions: list and edit inquiry-linked applications, review/reject/approve, enroll approved
+  applications, and upload/verify the six required document types.
+- Dashboard: permission-scoped counts and admission-status totals from
+  `GET /api/v1/dashboard/summary`, plus recent inquiries from the inquiry-list API.
+  Upcoming interviews show the count and next five schedules in the configured
+  `SCHOOL_TIMEZONE`; applicant names are included only for accounts with both
+  `interviews.read` and `inquiries.read`. Unauthorized metrics are returned as `null` and
+  hidden by the frontend.
 
 Relationship selectors use the available list APIs and are limited to the first 100 records;
 the backend has no bulk-assignment or dedicated lookup endpoints. Class lists support academic
-year and status filters, but not name search. Admissions, reporting, attendance, and salary
-pages remain placeholders.
+year and status filters, but not name search. Staff inquiry editing is limited to internal
+notes and requested-class mapping; applicant profile editing is not available in the staff
+API. The backend does not expose a document download endpoint, so stored paths are shown as
+status only, not as browser links. Attendance and salary pages remain placeholders.
 
 Run frontend checks from `frontend/`:
 

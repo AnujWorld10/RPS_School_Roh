@@ -25,6 +25,16 @@ def get_unique_admission_payload(suffix=""):
     }
 
 
+def valid_admission_form_details():
+    return {
+        "student_aadhaar": "123456789012",
+        "parent_aadhaar": "987654321098",
+        "last_school_marks": "450",
+        "last_school_percentage": "90",
+        "last_school_id_or_roll_number": "ROLL-12",
+    }
+
+
 def test_admission_flow_from_inquiry_creation_to_submission(client, db_session, auth_headers):
     """
     E2E test: Create inquiry → verify status → mark interview pass → submit admission form.
@@ -114,6 +124,48 @@ def test_admission_submission_with_invalid_credentials_fails(client):
         },
     )
     assert admission_resp.status_code == 401
+
+
+def test_public_admission_rejects_academic_year_not_in_selected_class(
+    client,
+    db_session,
+):
+    from app.models.class_model import Class
+    from app.models.enums import ClassStatus, InquiryStatus
+    from app.repositories.inquiries import StudentInquiryRepository
+
+    payload = get_unique_admission_payload("YEAR")
+    create_resp = client.post("/api/v1/public/student/inquiry", json=payload)
+    assert create_resp.status_code == 201
+    inquiry_code = create_resp.json()["data"]["inquiry_code"]
+    inquiry = StudentInquiryRepository(db_session).get_by_code_with_history(inquiry_code)
+    assert inquiry is not None
+    inquiry.status = InquiryStatus.INTERVIEW_PASS.value
+    school_class = (
+        db_session.query(Class)
+        .filter(
+            Class.status == ClassStatus.ACTIVE.value,
+            Class.deleted_at.is_(None),
+        )
+        .first()
+    )
+    assert school_class is not None
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/public/student/admission",
+        data={
+            "inquiry_code": inquiry_code,
+            "email": payload["email"],
+            "parent_mobile": payload["parent_mobile"],
+            "class_id": school_class.id,
+            "academic_year": "2099-2100",
+            **valid_admission_form_details(),
+        },
+    )
+
+    assert response.status_code == 422
+    assert "does not match the selected class" in response.json()["errors"][0]["message"]
 
 
 def test_admission_submission_with_wrong_mobile_fails(client):

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.email import AppEmail
@@ -39,6 +41,10 @@ class UserRegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: AppEmail = Field(description="Email address registered to the account.")
     password: str = Field(..., description="Account password.")
+    portal: Literal["student", "parent", "teacher", "administration"] | None = Field(
+        default=None,
+        description="Optional portal role required for this sign-in.",
+    )
 
 
 class RefreshTokenRequest(BaseModel):

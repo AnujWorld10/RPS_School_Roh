@@ -18,16 +18,18 @@ export function Sidebar({ collapsed = false, onNavigate, onToggleCollapse }: Sid
     .map((group) => ({
       ...group,
       items: group.items.filter((item) =>
-        hasAnyPermission(user?.permissions ?? [], item.anyPermission ?? []),
+        hasAnyPermission(user?.permissions ?? [], item.anyPermission ?? [])
+        && (item.allPermissions ?? []).every((permission) => user?.permissions?.includes(permission))
+        && (!item.anyRole || item.anyRole.some((role) => user?.roles.includes(role))),
       ),
     }))
     .filter((group) => group.items.length > 0)
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div
         className={cn(
-          'flex h-[72px] shrink-0 items-center border-b border-slate-200 px-5',
+          'flex h-[72px] shrink-0 items-center border-b border-sidebar-border px-5',
           collapsed && 'justify-center px-3',
         )}
       >
@@ -35,15 +37,15 @@ export function Sidebar({ collapsed = false, onNavigate, onToggleCollapse }: Sid
           aria-label="RPS School Management home"
           className="flex min-w-0 items-center gap-3"
           onClick={onNavigate}
-          to="/"
+          to="/dashboard"
         >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-indigo-700 text-white">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-400 text-slate-950 shadow-sm shadow-amber-950/20">
             <GraduationCap aria-hidden="true" size={20} />
           </span>
           {!collapsed ? (
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-slate-950">RPS School</span>
-              <span className="mt-0.5 block truncate text-xs text-slate-500">Administration</span>
+              <span className="block truncate text-sm font-semibold text-white">RPS School</span>
+              <span className="mt-0.5 block truncate text-xs text-slate-300">Administration</span>
             </span>
           ) : null}
         </NavLink>
@@ -53,7 +55,7 @@ export function Sidebar({ collapsed = false, onNavigate, onToggleCollapse }: Sid
         {visibleGroups.map((group) => (
           <section aria-label={group.label} key={group.label}>
             {!collapsed ? (
-              <h2 className="mb-2 px-3 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-slate-400">
+              <h2 className="mb-2 px-3 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-teal-200/80">
                 {group.label}
               </h2>
             ) : null}
@@ -63,12 +65,12 @@ export function Sidebar({ collapsed = false, onNavigate, onToggleCollapse }: Sid
                   aria-label={collapsed ? label : undefined}
                   className={({ isActive }) =>
                     cn(
-                      'group flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600',
-                      isActive && 'bg-indigo-50 text-indigo-800 hover:bg-indigo-50',
+                      'group flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-sidebar-accent hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring',
+                      isActive && 'bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary',
                       collapsed && 'justify-center px-0',
                     )
                   }
-                  end={path === '/'}
+                  end={path === '/dashboard'}
                   key={path}
                   onClick={onNavigate}
                   title={collapsed ? label : undefined}
@@ -84,10 +86,10 @@ export function Sidebar({ collapsed = false, onNavigate, onToggleCollapse }: Sid
       </nav>
 
       {onToggleCollapse ? (
-        <div className="hidden border-t border-slate-200 p-3 lg:block">
+        <div className="hidden border-t border-sidebar-border p-3 lg:block">
           <Button
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={cn('w-full justify-start text-slate-500', collapsed && 'justify-center')}
+            className={cn('w-full justify-start text-slate-300 hover:bg-sidebar-accent hover:text-white', collapsed && 'justify-center')}
             onClick={onToggleCollapse}
             size="sm"
             variant="ghost"

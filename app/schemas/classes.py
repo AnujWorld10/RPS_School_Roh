@@ -66,6 +66,13 @@ class ClassResponse(ORMModel):
     status: ClassStatus = Field(..., description="Class state: active or inactive.")
 
 
+class PublicClassOptionResponse(BaseModel):
+    id: int = Field(..., description="Internal class catalog ID used by the application.")
+    name: str = Field(..., description="Class or grade name shown to families.")
+    section: str | None = Field(..., description="Section, when the school uses sections.")
+    academic_year: str = Field(..., description="Academic year accepting applications.")
+
+
 class ClassFilterParams(BaseModel):
     academic_year: str | None = Field(
         default=None, description="Filter by academic year.", examples=["2026-2027"]

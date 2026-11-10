@@ -15,9 +15,38 @@ from app.schemas.auth import (
     UserRegisterRequest,
     UserResponse,
 )
+from app.schemas.student_portal import (
+    StudentPortalLoginRequest,
+    StudentPortalRegistrationRequest,
+)
 from app.services.auth import AuthService, _collect_roles_and_permissions
+from app.services.student_portal import StudentPortalService
 
 router = APIRouter()
+
+
+@router.post("/student/register", status_code=status.HTTP_201_CREATED)
+def register_student_portal(
+    payload: StudentPortalRegistrationRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+):
+    result = StudentPortalService(db).register(payload, request)
+    return success_response(
+        "Student portal account created. You can now sign in with your student ID.",
+        result.model_dump(),
+        request,
+    )
+
+
+@router.post("/student/login")
+def login_student_portal(
+    payload: StudentPortalLoginRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+):
+    data = StudentPortalService(db).login(payload.student_id, payload.password, request)
+    return success_response("Login successful", data, request)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)

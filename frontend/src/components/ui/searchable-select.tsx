@@ -28,6 +28,7 @@ export function SearchableSelect({
   const id = useId()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const selected = options.find((option) => option.value === value)
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
@@ -35,39 +36,79 @@ export function SearchableSelect({
       ? options.filter((option) => option.label.toLocaleLowerCase().includes(normalizedQuery))
       : options
   }, [options, query])
+  const listboxOptions = useMemo(
+    () => [
+      ...(value ? [{ value: '', label: 'Clear selection' }] : []),
+      ...filteredOptions,
+    ],
+    [filteredOptions, value],
+  )
 
   function choose(option: SearchableOption) {
     onChange(option.value)
     setQuery('')
     setOpen(false)
+    setActiveIndex(-1)
   }
 
   return (
-    <div className="relative grid gap-2">
+    <div className="relative grid min-w-0 gap-2">
       <label className="text-sm font-medium text-slate-800" htmlFor={id}>
         {label}
       </label>
       <div className="relative">
         <Input
+          className="h-10"
           aria-autocomplete="list"
           aria-controls={`${id}-options`}
+          aria-activedescendant={open && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
           aria-expanded={open}
           autoComplete="off"
           disabled={disabled}
           id={id}
-          onBlur={() => {
-            window.setTimeout(() => setOpen(false), 120)
-          }}
+          onBlur={() => setOpen(false)}
           onChange={(event) => {
             setQuery(event.target.value)
             setOpen(true)
+            setActiveIndex(0)
           }}
-          onFocus={() => setOpen(true)}
+          onClick={() => {
+            setOpen(true)
+            setActiveIndex(-1)
+          }}
+          onFocus={() => {
+            setOpen(true)
+            setActiveIndex(-1)
+          }}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') setOpen(false)
-            if (event.key === 'ArrowDown' && filteredOptions[0]) {
+            if (event.key === 'Escape') {
+              setOpen(false)
+              setActiveIndex(-1)
+              event.stopPropagation()
+            }
+            if (event.key === 'ArrowDown' && listboxOptions.length) {
               event.preventDefault()
-              choose(filteredOptions[0])
+              setOpen(true)
+              setActiveIndex((index) => Math.min(index + 1, listboxOptions.length - 1))
+            }
+            if (event.key === 'ArrowUp' && listboxOptions.length) {
+              event.preventDefault()
+              setOpen(true)
+              setActiveIndex((index) => index < 0
+                ? listboxOptions.length - 1
+                : Math.max(index - 1, 0))
+            }
+            if (event.key === 'Home' && open && listboxOptions.length) {
+              event.preventDefault()
+              setActiveIndex(0)
+            }
+            if (event.key === 'End' && open && listboxOptions.length) {
+              event.preventDefault()
+              setActiveIndex(listboxOptions.length - 1)
+            }
+            if (event.key === 'Enter' && open && activeIndex >= 0) {
+              event.preventDefault()
+              choose(listboxOptions[activeIndex])
             }
           }}
           placeholder={selected?.label ?? placeholder}
@@ -85,39 +126,25 @@ export function SearchableSelect({
           id={`${id}-options`}
           role="listbox"
         >
-          {value ? (
-            <li>
-              <button
-                className="w-full rounded-md px-2 py-2 text-left text-sm text-slate-500 hover:bg-slate-50"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange('')
-                  setQuery('')
-                  setOpen(false)
-                }}
-                role="option"
-                type="button"
-              >
-                Clear selection
-              </button>
-            </li>
-          ) : null}
-          {filteredOptions.map((option) => (
-            <li key={option.value}>
-              <button
-                aria-selected={value === option.value}
-                className={cn(
-                  'flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50',
-                  value === option.value && 'bg-indigo-50 text-indigo-900',
-                )}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(option)}
-                role="option"
-                type="button"
-              >
-                <span>{option.label}</span>
-                {value === option.value ? <Check aria-hidden="true" className="size-4" /> : null}
-              </button>
+          {listboxOptions.map((option, index) => (
+            <li
+              aria-selected={value === option.value}
+              className={cn(
+                'flex cursor-pointer items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50',
+                value === option.value && 'bg-teal-50 text-teal-950',
+                activeIndex === index && 'bg-slate-100',
+                option.value === '' && 'text-slate-500',
+              )}
+              id={`${id}-option-${index}`}
+              key={option.value || 'clear-selection'}
+              onClick={() => choose(option)}
+              onMouseDown={(event) => event.preventDefault()}
+              role="option"
+            >
+              <span>{option.label}</span>
+              {value === option.value && option.value !== '' ? (
+                <Check aria-hidden="true" className="size-4" />
+              ) : null}
             </li>
           ))}
           {filteredOptions.length === 0 ? (

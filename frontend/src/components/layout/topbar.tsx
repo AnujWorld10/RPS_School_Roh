@@ -42,12 +42,12 @@ export function Topbar({ onToggleSidebar }: TopbarProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-[72px] shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-[72px] shrink-0 items-center justify-between border-b border-border bg-white/95 px-4 shadow-sm shadow-slate-900/5 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <Sheet onOpenChange={setMobileNavigationOpen} open={mobileNavigationOpen}>
           <SheetTrigger
             aria-label="Open navigation"
-            className="inline-flex size-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 lg:hidden"
+            className="inline-flex size-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-teal-50 hover:text-teal-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 lg:hidden"
           >
             <Menu aria-hidden="true" size={19} />
           </SheetTrigger>
@@ -81,7 +81,7 @@ export function Topbar({ onToggleSidebar }: TopbarProps) {
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="Open account menu"
-          className="flex items-center gap-2 rounded-lg p-1.5 text-left hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="flex items-center gap-2 rounded-lg p-1.5 text-left hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
         >
           <span className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-slate-600">
             <UserRound aria-hidden="true" size={17} />
