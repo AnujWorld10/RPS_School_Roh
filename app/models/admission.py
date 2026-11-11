@@ -5,9 +5,10 @@ Flow: inquiry (interview pass) → admission application → documents → enrol
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import BIGINT_PK, Base, TimestampMixin
@@ -75,6 +76,13 @@ class InquiryAdmission(Base, TimestampMixin):
         comment="Admission workflow status",
     )
     permanent_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    student_aadhaar_encrypted: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    student_aadhaar_last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    parent_aadhaar_encrypted: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    parent_aadhaar_last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    last_school_marks: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    last_school_percentage: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    last_school_id_or_roll_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
     temporary_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     nationality: Mapped[str | None] = mapped_column(String(100), nullable=True)
     disability: Mapped[str | None] = mapped_column(String(255), nullable=True)

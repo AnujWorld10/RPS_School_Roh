@@ -1,9 +1,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permissions
+from app.api.deps import require_permissions, require_roles
+from app.core.exceptions import AppException
 from app.core.pagination import PaginationParams, pagination_params
 from app.core.responses import paginated_response, success_response
 from app.db.session import get_db
@@ -16,9 +18,52 @@ from app.schemas.students import (
     StudentUpdateRequest,
 )
 from app.schemas.subjects import SubjectResponse
+from app.services.student_portal import StudentPortalService
 from app.services.students import StudentService
 
 router = APIRouter()
+
+
+@router.get("/me")
+def get_my_student_profile(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles("STUDENT"))],
+):
+    profile = StudentPortalService(db).get_profile(current_user.id)
+    return success_response("Student profile fetched successfully", profile.model_dump(), request)
+
+
+@router.get("/me/fees")
+def get_my_student_fee_details(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles("STUDENT"))],
+):
+    details = StudentPortalService(db).get_fee_details(current_user.id)
+    return success_response(
+        "Student fee schedules fetched successfully", details.model_dump(), request
+    )
+
+
+@router.get(
+    "/me/fees/monthly/pdf",
+    response_class=Response,
+    responses={501: {"description": "Fee invoices and payment records are not configured."}},
+)
+def download_my_monthly_fee_pdf(
+    month: Annotated[int, Query(ge=1, le=12)],
+    year: Annotated[int, Query(ge=2000, le=9999)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles("STUDENT"))],
+):
+    StudentPortalService(db).get_profile(current_user.id)
+    raise AppException(
+        "Monthly fee PDFs are unavailable because invoice and payment collection records "
+        "are not configured.",
+        code="FEE_BILLING_UNAVAILABLE",
+        status_code=501,
+    )
 
 
 @router.get("/{student_id}/subjects")

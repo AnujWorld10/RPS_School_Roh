@@ -11,6 +11,14 @@ ENV/
 env/
 __pypackages__/
 
+# Frontend local configuration and generated files
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
 # Packaging
 dist/
 build/

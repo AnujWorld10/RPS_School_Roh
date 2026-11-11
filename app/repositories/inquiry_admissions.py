@@ -18,6 +18,19 @@ class InquiryAdmissionRepository(BaseRepository[InquiryAdmission]):
         stmt = select(InquiryAdmission).where(InquiryAdmission.inquiry_id == inquiry_id)
         return self.session.scalar(stmt)
 
+    def get_for_public_status(self, inquiry_id: int) -> InquiryAdmission | None:
+        stmt = (
+            select(InquiryAdmission)
+            .where(InquiryAdmission.inquiry_id == inquiry_id)
+            .options(
+                selectinload(InquiryAdmission.documents),
+                selectinload(InquiryAdmission.student),
+                selectinload(InquiryAdmission.school_class),
+                selectinload(InquiryAdmission.inquiry),
+            )
+        )
+        return self.session.scalar(stmt)
+
     def get_with_documents(
         self,
         admission_id: int,

@@ -4,6 +4,7 @@ from app.models.enums import REQUIRED_ADMISSION_DOCUMENTS
 from app.models.student_inquiry import StudentInquiry
 from app.schemas.inquiries import (
     InquiryStatusHistoryResponse,
+    PublicAdmissionDocumentSummary,
     PublicAdmissionSummary,
     PublicInquiryStatusResponse,
     PublicInterviewSummary,
@@ -33,11 +34,39 @@ def to_public_status_response(inquiry: StudentInquiry) -> PublicInquiryStatusRes
         )
     admission_summary = None
     if inquiry.admission:
+        student = inquiry.admission.student
+        school_class = inquiry.admission.school_class
         admission_summary = PublicAdmissionSummary(
             admission_code=inquiry.admission.admission_code,
             status=inquiry.admission.status,
             documents_uploaded=len(inquiry.admission.documents),
             documents_required=len(REQUIRED_ADMISSION_DOCUMENTS),
+            documents=[
+                PublicAdmissionDocumentSummary(
+                    document_type=document.document_type,
+                    verification_status=document.verification_status,
+                    rejection_reason=document.rejection_reason,
+                )
+                for document in inquiry.admission.documents
+            ],
+            student_code=student.student_code if student else None,
+            student_name=(
+                " ".join(
+                    part
+                    for part in (
+                        inquiry.first_name,
+                        inquiry.middle_name,
+                        inquiry.last_name,
+                    )
+                    if part
+                )
+                if student
+                else None
+            ),
+            class_name=school_class.name if student and school_class else None,
+            section=inquiry.admission.section if student else None,
+            academic_year=inquiry.admission.academic_year if student else None,
+            roll_number=student.roll_number if student else None,
         )
     return PublicInquiryStatusResponse(
         inquiry_code=inquiry.inquiry_code,

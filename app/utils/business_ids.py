@@ -1,5 +1,5 @@
 """
-Generate human-readable business identifiers (INQ, ADM, STU codes).
+Generate human-readable business identifiers (INQ, ADM, RPS codes).
 """
 
 from datetime import UTC, datetime
@@ -7,20 +7,20 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import BusinessRuleException
 from app.models.admission import InquiryAdmission
+from app.models.business_id_sequence import BusinessIDSequence
 from app.models.student import Student
 
 ADM_PREFIX = "ADM"
-STU_PREFIX = "STU"
+STUDENT_PREFIX = "RPS"
 
 
 def _next_serial(session: Session, model, code_column, prefix: str, year: int) -> int:
     """Return next serial number for codes matching ``{prefix}{year}``."""
     pattern = f"{prefix}{year}%"
     max_serial = session.scalar(
-        select(func.count())
-        .select_from(model)
-        .where(code_column.like(pattern))
+        select(func.count()).select_from(model).where(code_column.like(pattern))
     )
     return int(max_serial or 0) + 1
 
@@ -47,7 +47,7 @@ def generate_admission_code(session: Session) -> str:
 
 def generate_student_code(session: Session) -> str:
     """
-    Allocate student business ID: STU{YYYY}{5-digit}.
+    Allocate the next school-wide student business ID: RPS{5-digit}.
 
     Args:
         session: Active SQLAlchemy session.
@@ -55,14 +55,20 @@ def generate_student_code(session: Session) -> str:
     Returns:
         Student code string.
     """
-    year = datetime.now(UTC).year
-    count = session.scalar(
-        select(func.count())
-        .select_from(Student)
-        .where(Student.student_code.like(f"{STU_PREFIX}{year}%"))
+    sequence = session.scalar(
+        select(BusinessIDSequence)
+        .where(BusinessIDSequence.sequence_name == "student")
+        .with_for_update()
     )
-    serial = int(count or 0) + 1
-    return f"{STU_PREFIX}{year}{serial:05d}"
+    if sequence is None:
+        raise RuntimeError(
+            "The student ID sequence is missing; apply database migrations and seed data."
+        )
+    if sequence.last_value >= 99_999:
+        raise BusinessRuleException("The school has reached the maximum number of student IDs.")
+    sequence.last_value += 1
+    session.flush()
+    return f"{STUDENT_PREFIX}{sequence.last_value:05d}"
 
 
 def allocate_roll_number(session: Session, class_id: int, academic_year: str) -> int:

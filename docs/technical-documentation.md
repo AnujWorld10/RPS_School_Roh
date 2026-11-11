@@ -1,6 +1,6 @@
 # School Management System — Technical Documentation
 
-**Last updated:** October 2026  
+**Last updated:** November 2026
 **API base URL (local):** `http://127.0.0.1:8000`  
 **API prefix:** `/api/v1`  
 **Interactive OpenAPI (Swagger):** `http://127.0.0.1:8000/docs`  
@@ -208,15 +208,28 @@ Copy `.env.example` to `.env` and update the settings for your machine:
 | `API_V1_PREFIX` | API version prefix | `/api/v1` |
 | `DATABASE_URL` | SQLAlchemy URL for your database | `mysql+pymysql://<user>:<password>@localhost:3306/school_db` |
 | `JWT_SECRET_KEY` | Signing secret; at least 32 random characters in production | Unique random string |
+| `ADMISSION_PII_ENCRYPTION_KEY` | Recommended dedicated Fernet key for admission Aadhaar; if unset, a separate key is derived from `JWT_SECRET_KEY` | Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `JWT_ALGORITHM` | JWT algorithm | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token TTL | `15` |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token TTL | `30` |
+| `SCHOOL_TIMEZONE` | IANA timezone used for interview scheduling and dashboard upcoming-interview calculations | `Asia/Kolkata` |
 | `PASSWORD_HASH_SCHEME` | Hash scheme | `argon2` |
 | `LOG_LEVEL` | Logging level | `INFO` |
-| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000` |
+| `CORS_ORIGINS` | Allowed origins (comma-separated) | `http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173` |
 | `UPLOAD_DIR` | Document storage path | `uploads` (optional) |
 | `MAX_UPLOAD_SIZE_MB` | Max upload size | `5` (optional) |
 | `ALLOWED_UPLOAD_EXTENSIONS` | Allowed extensions | `pdf,jpg,jpeg,png` |
+
+Admission Aadhaar values are validated as 12-digit strings, encrypted before database
+storage, and never returned in full. Prefer a dedicated `ADMISSION_PII_ENCRYPTION_KEY`
+stored in a secrets manager and backed up separately. If it is unset, the application
+derives an admission-specific key from `JWT_SECRET_KEY` using HKDF-SHA256. Keep whichever
+key source is in use stable across restarts and back it up securely; changing it prevents
+decryption of Aadhaar values encrypted with the previous key.
+Staff APIs expose only masked numbers. Admission documents are submitted by parents,
+viewed through the permission-protected staff document endpoint, and verified/rejected
+before enrollment. After enrollment, parents can retrieve the assigned student ID and
+download an admission confirmation PDF using their inquiry credentials.
 
 ### 3.5 Migrations & Seed
 
@@ -429,6 +442,7 @@ Settings are loaded via `app.core.config.Settings` (Pydantic Settings) from envi
 | Database | `DATABASE_URL` | SQLAlchemy connection string |
 | JWT | `JWT_*` | Secret, algorithm, expiry |
 | CORS | `CORS_ORIGINS` | Comma-separated list |
+| Interview scheduling | `SCHOOL_TIMEZONE` | IANA timezone for school-local schedule dates and times |
 | Uploads | `UPLOAD_DIR`, `MAX_UPLOAD_SIZE_MB` | Admission documents |
 | Logging | `LOG_*` | Daily file logs, error-only logs, retention |
 
@@ -645,6 +659,25 @@ sequenceDiagram
     API->>DB: Revoke refresh token
 ```
 
+The API returns both tokens in the login JSON response; it does not set HttpOnly cookies.
+The frontend therefore keeps the access and refresh tokens in JavaScript memory only,
+never in local storage, session storage, or a persistent browser cookie. Reloading the page
+ends the frontend session and requires another sign-in. Protected requests use
+`Authorization: Bearer <access_token>`. On a `401`, the frontend makes one shared
+`POST /auth/refresh-token` request with the current refresh token, then retries the original
+request once. The refresh endpoint returns a new access token but does not rotate the
+refresh token.
+This keeps tokens out of persistent browser storage, but JavaScript running in the page can
+still access the active session; production deployments must use HTTPS and protect the
+frontend against cross-site scripting.
+
+Logout sends the refresh token in `POST /auth/logout` and clears frontend memory even if
+the request fails. The backend revokes that refresh token; existing access JWTs are not
+revoked and remain usable until their short access-token expiry. A `403` does not trigger a
+refresh: the frontend displays an access-denied state. Frontend navigation and action
+permission checks are usability controls only; the API's role and permission dependencies
+remain authoritative.
+
 ### 8.2 Token Claims (Access)
 
 ```json
@@ -755,6 +788,146 @@ The duplicate behavior is covered by unit tests for exact and case-insensitive m
 different names/DOB, reapplication after rejection/interview failure, and the service
 conflict path. A duplicate submission returns HTTP 409 with the standard error envelope;
 see the shared runtime error examples in the API reference.
+
+### 9.5.1 Frontend integration boundaries
+
+- The staff inquiry API supports list/detail, review transitions, rejection, internal notes,
+  and requested-class mapping. It does not expose staff editing for applicant profile fields.
+- Interviews are listed per inquiry; there is no global interview-list endpoint. A failed or
+  absent interview locks that inquiry, and reapplication uses a new inquiry record.
+- Admission documents can be uploaded, replaced, and verified/rejected. The API has no
+  download endpoint; its stored `file_path` is not a browser-accessible URL. Replacing a
+  document resets verification and can return an approved workflow to document review.
+- Duplicate inquiry submissions return HTTP 409, but the response does not identify the
+  matching inquiry or return a separate duplicate-warning object.
+
+### 9.5.2 Frontend validation and usability
+
+- React Hook Form and Zod provide client-side field validation; forms disable native browser
+  validation bubbles so field errors are displayed consistently. Backend validation remains
+  authoritative, and its field-level error details are included in the shared API error.
+- Inquiry date of birth is validated as an ISO date and cannot be in the future.
+- Searchable relationship selectors support Arrow Up/Down, Home/End, Enter, Escape, and
+  pointer selection. Record lists return to the last available page when a deletion empties
+  the current page; pagination controls also normalize out-of-range display values.
+- Destructive confirmation dialogs include an explicit Cancel action. Document extension
+  and size validation are performed by the backend using its configured limits; the
+  frontend does not apply a separate hard-coded upload cap.
+
+### 9.5.3 Dashboard and reporting integration
+
+- `GET /api/v1/dashboard/summary` returns permission-filtered live counts for students,
+  teachers, classes, subjects, inquiries, pending admissions, and admissions grouped by
+  their actual workflow statuses. Each metric is populated only when the caller has the
+  corresponding `*.read` permission; unavailable metrics are `null`. Student totals use
+  the existing student service and preserve its user-specific visibility rules.
+- Pending admissions include only `draft`, `submitted`, `document_pending`, and
+  `document_verification` statuses. The status distribution counts inquiry-linked
+  applications by their actual `AdmissionStatus` values.
+- Upcoming interview counts include scheduled interviews whose inquiry is currently in
+  `INTERVIEW_SCHEDULED`, from the current date/time in `SCHOOL_TIMEZONE` onward.
+  The response includes up to the next five interview details when the caller has
+  `inquiries.read`; names and inquiry codes are not returned otherwise. Date and time
+  values are school-local, and the response includes the configured IANA timezone.
+- The endpoint requires authentication and at least one of the relevant school, inquiry,
+  admission, or interview read permissions. It does not expose a unified recent-activity
+  feed. The frontend loads recent inquiries separately from the inquiry list API so that
+  recent-inquiry failures do not mask an otherwise successful summary.
+- Configure `SCHOOL_TIMEZONE` to a valid IANA timezone. Its default is `Asia/Kolkata`.
+
+### 9.5.4 Public parent admission portal
+
+The frontend exposes parent-facing routes outside the authenticated staff shell:
+
+| Frontend route | Backend request | Verification / rule |
+|----------------|-----------------|---------------------|
+| `/` and `/apply` | `POST /api/v1/public/student/inquiry` | Public default home and explicit inquiry route; public inquiry validation and duplicate detection apply. |
+| `/application/status` | `GET /api/v1/public/student/inquiry/status/{inquiry_code}` | Sends `X-Parent-Email` and `X-Parent-Mobile`; both must match the inquiry. |
+| `/application/update` | `PUT /api/v1/public/student/inquiry/update` | Sends inquiry code, parent email, and parent mobile with the permitted changes; the service rejects locked inquiry states and duplicate identities. |
+| `/application/submit` | `GET /api/v1/public/student/classes`, then `POST /api/v1/public/student/admission` | The parent verifies inquiry credentials first. Only active classes are listed; academic years come from those class records, and the selected class ID is submitted by the frontend. The admission API verifies the parent contacts, requires inquiry status `INTERVIEW_PASS`, and checks that the academic year matches the selected class. |
+
+These requests use an Axios client that does not attach staff bearer tokens. Public means no
+school-app login is required; it does not mean anonymous access to another family's inquiry.
+The admission form uses the inquiry's requested class as a suggested selection when it matches
+an available class; parents can confirm it or choose another class. The application code is
+for internal workflow; parents continue tracking with the `INQ...` inquiry code. After
+successful enrollment, the final admission and student ID is the same `RPS...` code used for
+student registration and sign-in.
+Unauthenticated visitors opening `/` see the public inquiry portal. The staff dashboard is
+available at `/dashboard` behind the existing authentication guard; successful staff sign-in
+defaults to that route.
+
+The public school navigation is available on the sign-in and parent-portal screens. It links
+to `/` and `/school/home` for the public homepage, plus About, Academics, Gallery, Notices,
+Events, and Contact sections. The school
+information routes without approved copy show an explicit unpublished-content notice. The
+homepage includes academic-stage links, a public events feed, and notice and gallery previews.
+Gallery uses optimized JPEG versions of the four supplied images in `frontend/images` (the
+original PNGs remain unchanged). Notices provide search and category
+controls but currently show an empty state: no public notices API or approved notice content
+is configured. The Contact page uses clearly labeled demo placeholders; Events loads published
+events for the `public` and `all` audiences from the public API.
+The parent-portal service bar exposes `New inquiry` and `Student Admission`. Its `Sign in`
+menu links to Student, Parent, Teacher, Administration, and Staff Login, and includes a
+student registration link. Parent, teacher, administration, and staff login use the existing
+email/password endpoint; student login accepts the assigned student ID and password. The
+backend verifies the account has the selected role before issuing tokens.
+The backend's contact verification, workflow checks, validation, duplicate handling, and
+ingress rate limits remain authoritative. The admission API requires an active class catalog
+ID but has no public class-list endpoint; the portal therefore asks the parent to obtain the
+numeric ID from the school instead of calling the permission-protected staff class API.
+
+### 9.5.5 Student, parent, teacher, and administration portals
+
+The four portal sign-in links are presentation choices, not separate authentication systems.
+`POST /api/v1/auth/login` accepts an optional `portal` value (`student`, `parent`, `teacher`,
+or `administration`) and rejects credentials that do not have the selected role. The API
+continues to enforce permissions independently of frontend route guards.
+
+Student portal accounts are self-registered only for an active student linked to an approved,
+completed inquiry admission. The registration ID and normalized registered email must match
+that admission and enrolled student; one user can link to only one student. Student profile
+and fee-schedule endpoints scope directly by the authenticated user's student link. Parent
+access retains the existing relationship check: the account email and mobile must both match
+an originating inquiry linked to an enrolled student. Email OTP is not available because no
+email-delivery service is configured.
+
+Student IDs use the school-wide sequential format `RPS` plus five digits. A database sequence
+row is locked and incremented inside the enrollment transaction. Once enrollment succeeds,
+the same ID is written to the student code, legacy student admission number, and admission
+business code. Migration `014_student_portal` adds the sequence and one-to-one student-user
+link. Existing historical business IDs are not rewritten.
+
+Fee schedules shown in the student dashboard are the configured class/year structures only.
+This project does not have student invoices, fee collection, or payment transactions, so the
+API deliberately returns null for paid/pending balances, due dates, and payment status.
+Monthly fee PDF download responds with `501 FEE_BILLING_UNAVAILABLE` until those ledger
+records exist; it does not generate a document with invented payment information.
+
+Teacher roles receive explicit student, inquiry-review, admission-approval, subject-catalog,
+assignment, assessment, timetable, and event permissions. Teachers may edit student records
+across the configured school scope. Teacher class/subject mapping endpoints allow a teacher
+to add or remove only their own mapping to an already existing class-subject offering; they
+cannot modify another teacher's mappings. Admin-managed class offerings and other teacher
+mappings remain protected by their existing permissions.
+
+Assignments begin as drafts and are visible to students/parents only after publication.
+Optional assignment files reuse the configured upload directory, extension allowlist, and
+maximum upload size, and are served only after the caller passes the assignment visibility
+check. Timetable periods require an offered subject and mapped teacher; overlapping periods
+for either a class or teacher are rejected for the same academic year and weekday. Assessment
+results are held unpublished, support an absent state without a score, and reject negative or
+above-maximum scores. Student and parent responses include only results for linked student
+records.
+
+Teacher-created events remain pending until an administrator publishes or rejects them.
+Editing a published teacher event sends it back for review. Published events with the
+`public` or `all` audience are returned by `GET /api/v1/public/events`; authenticated event
+lists are filtered to the caller's role and audience. Teacher creates/updates, assignment and timetable
+changes, assessment/results, mapping changes, and administrator event decisions write actor,
+timestamp, entity/action, and old/new values to the existing audit log within the database
+transaction. The shared audit log is append-only by application convention; database-level
+immutability controls are not configured.
 
 ### 9.6 Class, subject, teacher, and student academic mapping
 
@@ -1161,6 +1334,37 @@ location ~ ^/api/v1/public/student/(inquiry(?:/.*)?|admission)$ {
 Tune thresholds for expected traffic and configure trusted real-IP sources before relying on
 forwarded addresses.
 
+### 15.6 Frontend Build and Deployment
+
+The React/Vite frontend is an independent project in `frontend/`. It requires Node.js
+`^22.12.0`, `^24.0.0`, or `>=26.0.0` and npm; Node.js 24 LTS is the recommended runtime.
+Install from the frontend directory with `npm ci`, then use `npm run dev` for local
+development. Run `npm run typecheck`, `npm run lint`, `npm run test:run`, and `npm run build`
+there to verify the frontend.
+
+`frontend/.env.example` contains the local API URL only. For a production build, provide
+`VITE_API_BASE_URL` as the full public API prefix (for example
+`https://api.example.com/api/v1`); the build fails if it is missing. Vite embeds this value
+in public assets, so it must never contain a password, token, or other secret. Use HTTPS for
+both frontend and API, and set backend `CORS_ORIGINS` to the exact deployed frontend origin.
+Do not use a permissive wildcard origin for an authenticated deployment.
+
+Deploy the contents of `frontend/dist/` to a static host configured to serve `index.html`
+for unknown application routes (history-API fallback). The API URL, TLS, allowed CORS origin,
+database migration, initial administrator, and persistent upload storage must all be ready
+before opening the frontend to users. Rebuild the static files when changing the API URL;
+Vite environment values are not runtime settings. The frontend stores access and refresh
+tokens in memory, so a page reload requires a new sign-in. Backend authorization remains
+the security boundary; frontend route guards and hidden controls are usability measures only.
+
+The frontend implements dashboard, student, teacher, class, subject, inquiry, interview,
+admission, admission-document, student/parent learning, teacher academic-workflow, and event
+review/publication workflows. It does not expose attendance or salary workflows, and the
+backend has no admission-document download endpoint. Account creation remains an
+administrator-provisioned process; public account registration and verified recovery flows
+are not implemented. No deployment to a production static host or production API is implied
+by a successful local build or automated test run.
+
 ---
 
 ## 16. Performance & Scalability
@@ -1201,7 +1405,7 @@ rate limiting is configured at ingress; password recovery is not implemented.
 | Module | Purpose |
 |--------|---------|
 | `app/utils/inquiry_ids.py` | INQ code generation |
-| `app/utils/business_ids.py` | ADM, STU codes, roll numbers |
+| `app/utils/business_ids.py` | ADM/RPS codes, roll numbers |
 | `app/utils/file_storage.py` | Save uploads |
 | `app/schemas/inquiry_mappers.py` | Public/staff response mapping |
 | `app/services/audit.py` | Audit log writes |
@@ -1340,8 +1544,8 @@ flowchart LR
 | Entity | Format | Example |
 |--------|--------|---------|
 | Inquiry | INQ{YYYY}{5-digit} | INQ202600001 |
-| Admission | ADM{YYYY}{5-digit} | ADM202600001 |
-| Student | STU{YYYY}{5-digit} | STU202600001 |
+| Admission application (before enrollment) | ADM{YYYY}{5-digit} | ADM202600001 |
+| Student / enrolled admission | RPS{5-digit} | RPS00001 |
 | Roll number | Integer per class+year | 1, 2, 3… |
 
 ---

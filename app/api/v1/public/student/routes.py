@@ -9,16 +9,24 @@ Endpoints:
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Header, Path, Request, status
+from fastapi import APIRouter, Depends, File, Form, Header, Path, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import Response
 from pydantic import EmailStr, ValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import AuthenticationException
+from app.core.exceptions import AuthenticationException, BusinessRuleException
 from app.core.responses import success_response
 from app.db.session import get_db
+from app.models.class_model import Class
+from app.models.enums import ClassStatus
 from app.repositories.inquiries import StudentInquiryRepository
-from app.schemas.admissions import InquiryAdmissionCreateRequest
+from app.schemas.admissions import (
+    PublicAdmissionDocumentUploadResponse,
+    PublicInquiryAdmissionCreateRequest,
+)
+from app.schemas.classes import PublicClassOptionResponse
 from app.schemas.inquiries import (
     PublicInquiryCreateRequest,
     PublicInquiryCreateResponse,
@@ -29,6 +37,34 @@ from app.services.inquiries import InquiryService
 from app.services.inquiry_admissions import InquiryAdmissionService
 
 router = APIRouter()
+
+
+@router.get(
+    "/classes",
+    summary="List classes available for public admission applications",
+)
+def list_public_class_options(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+):
+    classes = db.scalars(
+        select(Class)
+        .where(
+            Class.status == ClassStatus.ACTIVE.value,
+            Class.deleted_at.is_(None),
+        )
+        .order_by(Class.academic_year, Class.name, Class.section)
+    ).all()
+    data = [
+        PublicClassOptionResponse(
+            id=school_class.id,
+            name=school_class.name,
+            section=school_class.section,
+            academic_year=school_class.academic_year,
+        ).model_dump()
+        for school_class in classes
+    ]
+    return success_response("Available admission classes fetched successfully", data, request)
 
 
 @router.post(
@@ -155,6 +191,26 @@ def submit_admission(
             examples=["2026-2027"],
         ),
     ],
+    student_aadhaar: Annotated[
+        str,
+        Form(description="12-digit student Aadhaar number."),
+    ] = "",
+    parent_aadhaar: Annotated[
+        str,
+        Form(description="12-digit parent/guardian Aadhaar number."),
+    ] = "",
+    last_school_marks: Annotated[
+        str,
+        Form(description="Marks obtained at the previous school."),
+    ] = "",
+    last_school_percentage: Annotated[
+        str,
+        Form(description="Percentage obtained at the previous school."),
+    ] = "",
+    last_school_id_or_roll_number: Annotated[
+        str,
+        Form(description="Previous-school student ID or roll number."),
+    ] = "",
     section: Annotated[
         str | None,
         Form(max_length=20, description="Optional section within the selected class."),
@@ -178,11 +234,18 @@ def submit_admission(
         raise AuthenticationException("Invalid inquiry credentials")
 
     try:
-        payload = InquiryAdmissionCreateRequest(
-            class_id=class_id,
-            section=section,
-            academic_year=academic_year,
-            permanent_address=permanent_address,
+        payload = PublicInquiryAdmissionCreateRequest.model_validate(
+            {
+                "class_id": class_id,
+                "section": section,
+                "academic_year": academic_year,
+                "permanent_address": permanent_address,
+                "student_aadhaar": student_aadhaar,
+                "parent_aadhaar": parent_aadhaar,
+                "last_school_marks": last_school_marks,
+                "last_school_percentage": last_school_percentage,
+                "last_school_id_or_roll_number": last_school_id_or_roll_number,
+            }
         )
     except ValidationError as exc:
         errors = [
@@ -200,4 +263,85 @@ def submit_admission(
         "Admission submitted successfully",
         {"admission_code": admission.admission_code, "status": admission.status},
         request,
+    )
+
+
+@router.post(
+    "/admission/documents",
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload an admission document as the verified parent",
+)
+def upload_public_admission_document(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    inquiry_code: Annotated[str, Form(min_length=5, max_length=20)],
+    email: Annotated[EmailStr, Form()],
+    parent_mobile: Annotated[str, Form(min_length=5, max_length=30)],
+    document_type: Annotated[str, Form()],
+    file: Annotated[UploadFile, File()],
+):
+    inquiry = StudentInquiryRepository(db).verify_parent_credentials(
+        inquiry_code.strip().upper(),
+        str(email),
+        parent_mobile.strip(),
+    )
+    if not inquiry:
+        raise AuthenticationException("Invalid inquiry credentials")
+    admission = InquiryAdmissionService(db).get_public_admission(inquiry.id)
+    document = InquiryAdmissionService(db).upload_document(
+        admission.id, document_type, file, request
+    )
+    data = PublicAdmissionDocumentUploadResponse(
+        document_type=document.document_type,
+        verification_status=document.verification_status,
+        rejection_reason=document.rejection_reason,
+        verified_at=document.verified_at,
+    ).model_dump()
+    return success_response("Admission document uploaded successfully", data, request)
+
+
+@router.get(
+    "/inquiry/status/{inquiry_code}/admission-letter",
+    summary="Download the admission letter after enrollment",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Parent-verified PDF admission letter.",
+            "content": {
+                "application/pdf": {
+                    "schema": {"type": "string", "format": "binary"},
+                }
+            },
+        }
+    },
+)
+def download_admission_letter(
+    inquiry_code: Annotated[str, Path(min_length=5, max_length=20)],
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    email: Annotated[EmailStr, Header(alias="X-Parent-Email")],
+    parent_mobile: Annotated[str, Header(alias="X-Parent-Mobile")],
+)-> Response:
+    from app.services.admission_letter import create_admission_letter
+
+    inquiry = StudentInquiryRepository(db).verify_parent_credentials(
+        inquiry_code.strip().upper(),
+        str(email),
+        parent_mobile.strip(),
+    )
+    if not inquiry:
+        raise AuthenticationException("Invalid inquiry credentials")
+    admission = InquiryAdmissionService(db).get_public_admission(inquiry.id)
+    if not admission.student:
+        raise BusinessRuleException("The admission letter is available after enrollment.")
+    content = create_admission_letter(admission)
+    student_code = admission.student.student_code
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'attachment; filename="{student_code}-admission.pdf"',
+            "X-Content-Type-Options": "nosniff",
+        },
     )

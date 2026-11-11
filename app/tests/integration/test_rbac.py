@@ -83,15 +83,16 @@ def test_create_inquiry_admission_with_permission_requires_valid_inquiry(client,
     assert response.status_code in [404, 400]
 
 
-def test_upload_admission_document_requires_permission(client):
-    """POST /admissions/inquiry-admissions/{id}/documents without permission returns 403."""
+def test_staff_cannot_upload_admission_documents(client, auth_headers):
+    """Admission documents are submitted by parents, not through staff upload routes."""
     response = client.post(
         "/api/v1/inquiry-admissions/1/documents",
         data={
             "document_type": "progress_report",
         },
+        headers=auth_headers,
     )
-    assert response.status_code in [401, 403]
+    assert response.status_code == 404
 
 
 def test_verify_document_requires_special_permission(client, auth_headers):

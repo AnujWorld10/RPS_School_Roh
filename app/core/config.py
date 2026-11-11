@@ -1,7 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from cryptography.fernet import Fernet, InvalidToken
 from pydantic import EmailStr, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,7 +15,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables and ``.env``."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -27,6 +29,10 @@ class Settings(BaseSettings):
     database_url: str = Field(..., description="SQLAlchemy database URL")
 
     jwt_secret_key: str = Field(..., min_length=16)
+    admission_pii_encryption_key: SecretStr | None = Field(
+        default=None,
+        description="Fernet key used to encrypt admission Aadhaar numbers.",
+    )
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
@@ -66,13 +72,20 @@ class Settings(BaseSettings):
         description="Run default seed only when explicitly enabled",
     )
 
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173"
+    )
 
     upload_dir: str = Field(
         default=str(PROJECT_ROOT / "uploads"),
         description="Directory for admission document uploads",
     )
     max_upload_size_mb: int = Field(default=5, description="Max upload file size in MB")
+    school_timezone: str = Field(
+        default="Asia/Kolkata",
+        description="IANA timezone used for local school interview schedules",
+    )
     allowed_upload_extensions: str = Field(
         default="pdf,jpg,jpeg,png",
         description="Comma-separated allowed file extensions",
@@ -84,6 +97,30 @@ class Settings(BaseSettings):
         if not value or not value.strip():
             raise ValueError("Required setting cannot be empty")
         return value.strip()
+
+    @field_validator("school_timezone")
+    @classmethod
+    def must_be_valid_timezone(cls, value: str) -> str:
+        timezone = value.strip()
+        try:
+            ZoneInfo(timezone)
+        except (ValueError, ZoneInfoNotFoundError) as exc:
+            raise ValueError("SCHOOL_TIMEZONE must be a valid IANA timezone") from exc
+        return timezone
+
+    @field_validator("admission_pii_encryption_key")
+    @classmethod
+    def validate_admission_pii_encryption_key(
+        cls, value: SecretStr | None
+    ) -> SecretStr | None:
+        if value is not None:
+            try:
+                Fernet(value.get_secret_value().encode())
+            except (ValueError, InvalidToken) as exc:
+                raise ValueError(
+                    "ADMISSION_PII_ENCRYPTION_KEY must be a valid Fernet key"
+                ) from exc
+        return value
 
     @model_validator(mode="after")
     def validate_initial_admin_credentials(self) -> "Settings":
@@ -140,4 +177,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return Settings()  # type: ignore[call-arg]

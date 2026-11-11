@@ -13,9 +13,12 @@ from app.schemas import (
     admissions,
     auth,
     classes,
+    dashboard,
     enrollment,
+    fees,
     inquiries,
     interviews,
+    student_portal,
     students,
     subjects,
     teachers,
@@ -29,21 +32,32 @@ RESPONSE_MODELS = {
     "approve_inquiry_admission": ("InquiryAdmissionResponse", False),
     "assign_student_class": ("StudentResponse", False),
     "create_class": ("ClassResponse", False),
+    "create_admission_fee_structure": ("AdmissionFeeStructureResponse", False),
+    "create_monthly_fee_structure": ("MonthlyFeeStructureResponse", False),
     "create_inquiry_admission": ("InquiryAdmissionResponse", False),
     "create_salary_payment": ("SalaryPaymentResponse", False),
     "create_student": ("StudentResponse", False),
     "create_teacher": ("TeacherResponse", False),
+    "delete_admission_fee_structure": ("AdmissionFeeStructureResponse", False),
+    "delete_monthly_fee_structure": ("MonthlyFeeStructureResponse", False),
     "enroll_student": ("EnrollmentResponse", False),
+    "get_dashboard_summary": ("DashboardSummaryResponse", False),
     "get_class": ("ClassResponse", False),
+    "get_admission_fee_structure": ("AdmissionFeeStructureResponse", False),
+    "get_monthly_fee_structure": ("MonthlyFeeStructureResponse", False),
     "get_inquiry": ("StudentInquiryResponse", False),
     "get_inquiry_admission": ("InquiryAdmissionResponse", False),
     "get_interview": ("InterviewResponse", False),
     "get_me": ("UserResponse", False),
+    "get_my_student_profile": ("StudentPortalProfileResponse", False),
+    "get_my_student_fee_details": ("StudentPortalFeeDetailsResponse", False),
     "get_inquiry_status": ("PublicInquiryStatusResponse", False),
     "get_student": ("StudentResponse", False),
     "get_teacher": ("TeacherResponse", False),
     "get_teacher_salary": ("SalaryResponse", False),
     "list_classes": ("ClassResponse", True),
+    "list_admission_fee_structures": ("AdmissionFeeStructureResponse", True),
+    "list_monthly_fee_structures": ("MonthlyFeeStructureResponse", True),
     "list_inquiries": ("StudentInquiryResponse", True),
     "list_inquiry_admissions": ("InquiryAdmissionResponse", True),
     "list_inquiry_interviews": ("InterviewResponse", False),
@@ -51,23 +65,29 @@ RESPONSE_MODELS = {
     "list_students": ("StudentResponse", True),
     "list_teachers": ("TeacherResponse", True),
     "login_user": ("TokenResponse", False),
+    "login_student_portal": ("TokenResponse", False),
     "record_attendance": ("AttendanceResponse", False),
     "record_interview_result": ("InterviewResponse", False),
     "refresh_token": ("RefreshTokenResponse", False),
     "register_user": ("RegisterUserResponse", False),
+    "register_student_portal": ("StudentPortalRegistrationResponse", False),
     "reject_inquiry_admission": ("InquiryAdmissionResponse", False),
     "reject_inquiry": ("StudentInquiryResponse", False),
     "schedule_interview": ("InterviewResponse", False),
     "start_inquiry_review": ("StudentInquiryResponse", False),
     "mark_inquiry_processing": ("StudentInquiryResponse", False),
     "update_class": ("ClassResponse", False),
+    "update_admission_fee_structure": ("AdmissionFeeStructureResponse", False),
+    "update_admission_fee_structure_status": ("AdmissionFeeStructureResponse", False),
+    "update_monthly_fee_structure": ("MonthlyFeeStructureResponse", False),
+    "update_monthly_fee_structure_status": ("MonthlyFeeStructureResponse", False),
     "update_inquiry_admin": ("StudentInquiryResponse", False),
     "update_inquiry_admission": ("InquiryAdmissionResponse", False),
     "update_student": ("StudentResponse", False),
     "update_student_status": ("StudentResponse", False),
     "update_student_inquiry": ("PublicInquiryStatusResponse", False),
     "update_teacher": ("TeacherResponse", False),
-    "upload_admission_document": ("AdmissionDocumentResponse", False),
+    "upload_public_admission_document": ("PublicAdmissionDocumentUploadResponse", False),
     "verify_document": ("AdmissionDocumentResponse", False),
     "verify_token": ("VerifyTokenResponse", False),
 }
@@ -76,10 +96,13 @@ RESPONSE_MODULES = (
     admissions,
     auth,
     classes,
+    dashboard,
     enrollment,
+    fees,
     inquiries,
     interviews,
     students,
+    student_portal,
     subjects,
     teachers,
 )
@@ -91,6 +114,10 @@ MODEL_REGISTRY = {
 }
 
 CUSTOM_RESPONSE_DATA = {
+    "list_public_class_options": (
+        [{"id": 1, "name": "Grade 5", "section": "A", "academic_year": "2026-2027"}],
+        False,
+    ),
     "activate_subject": (
         {"id": 1, "code": "MATH", "name": "Mathematics", "is_active": True},
         False,
@@ -273,14 +300,76 @@ SAMPLE_VALUES = {
 }
 
 MODEL_FIELD_EXAMPLES = {
+    "AdmissionFeeStructureResponse": {
+        "components": [
+            {
+                "id": 1,
+                "fee_name": "Registration",
+                "amount": 100.0,
+                "is_refundable": False,
+                "is_optional": False,
+                "description": None,
+                "created_at": "2026-10-20T10:00:00Z",
+            },
+            {
+                "id": 2,
+                "fee_name": "Uniform",
+                "amount": 20.0,
+                "is_refundable": False,
+                "is_optional": True,
+                "description": None,
+                "created_at": "2026-10-20T10:00:00Z",
+            },
+        ],
+        "mandatory_total": 100.0,
+        "optional_total": 20.0,
+        "total_amount": 120.0,
+    },
     "AdmissionDocumentResponse": {
         "document_type": "progress_report",
-        "file_path": "uploads/admissions/1/progress-report.pdf",
         "verification_status": "PENDING",
     },
     "AdmissionResponse": {"status": "submitted"},
     "AttendanceResponse": {"status": "present"},
     "ClassResponse": {"status": "active"},
+    "DashboardSummaryResponse": {
+        "school_timezone": "Asia/Kolkata",
+        "admissions_by_status": {
+            "draft": 1,
+            "submitted": 1,
+            "document_pending": 1,
+            "document_verification": 1,
+            "approved": 1,
+            "rejected": 1,
+        },
+        "MonthlyFeeStructureResponse": {
+            "components": [
+                {
+                    "id": 1,
+                    "fee_name": "Tuition",
+                    "amount": 100.0,
+                    "billing_frequency": "MONTHLY",
+                    "is_optional": False,
+                    "description": None,
+                    "created_at": "2026-10-20T10:00:00Z",
+                },
+                {
+                    "id": 2,
+                    "fee_name": "Activity",
+                    "amount": 500.0,
+                    "billing_frequency": "ONE_TIME",
+                    "is_optional": True,
+                    "description": None,
+                    "created_at": "2026-10-20T10:00:00Z",
+                },
+            ],
+            "mandatory_annual_total": 1200.0,
+            "optional_annual_total": 500.0,
+            "mandatory_monthly_equivalent": 100.0,
+            "optional_monthly_equivalent": 41.67,
+            "total_annual_amount": 1700.0,
+        },
+    },
     "InquiryAdmissionResponse": {"status": "submitted", "documents": []},
     "InterviewResponse": {"mode": "OFFLINE", "result": "SCHEDULED"},
     "PublicInquiryStatusResponse": {"status": "PENDING"},
@@ -412,9 +501,7 @@ def sample_value(
                 option
                 for option in schema[union]
                 if option.get("type") != "null"
-                and not (
-                    option.get("$ref", "").endswith("/NoneType")
-                )
+                and not (option.get("$ref", "").endswith("/NoneType"))
             ]
             if not options:
                 return None
@@ -547,8 +634,7 @@ def success_message(handler_name: str) -> str | None:
         (
             route.endpoint
             for route in app.routes
-            if getattr(route, "endpoint", None)
-            and route.endpoint.__name__ == handler_name
+            if getattr(route, "endpoint", None) and route.endpoint.__name__ == handler_name
         ),
         None,
     )
@@ -617,8 +703,7 @@ def authorization_requirement(handler_name: str | None) -> str:
         (
             route.endpoint
             for route in app.routes
-            if getattr(route, "endpoint", None)
-            and route.endpoint.__name__ == handler_name
+            if getattr(route, "endpoint", None) and route.endpoint.__name__ == handler_name
         ),
         None,
     )
@@ -659,6 +744,8 @@ def authorization_requirement(handler_name: str | None) -> str:
 
     if permissions:
         values = ", ".join(f"`{value}`" for value in permissions)
+        if len(permissions) > 1:
+            return f"Requires at least one of these permissions: {values}."
         return f"Requires permission {values}."
     if roles:
         values = ", ".join(f"`{value}`" for value in roles)
@@ -699,9 +786,7 @@ def render_operation(
     else:
         value = "Not specified by OpenAPI"
     lines.extend([f"**OpenAPI authentication:** {value}", ""])
-    lines.extend(
-        [f"**Authorization requirement:** {authorization_requirement(handler)}", ""]
-    )
+    lines.extend([f"**Authorization requirement:** {authorization_requirement(handler)}", ""])
 
     parameters = operation.get("parameters", [])
     if parameters:
@@ -760,26 +845,32 @@ def render_operation(
         None,
     )
     if success_status and handler:
-        sample, note = response_example(
-            handler,
-            method,
-            components,
-        )
         lines.extend(["**Illustrative success response**", ""])
-        if sample is not None:
+        success_content = operation["responses"][success_status].get("content", {})
+        if "application/pdf" in success_content:
             lines.extend(
                 [
-                    f"HTTP `{success_status}`. IDs, dates, request IDs, and tokens below "
-                    "are illustrative; the token strings are not valid credentials.",
-                    "",
-                    "```json",
-                    json.dumps(sample, indent=2, ensure_ascii=False),
-                    "```",
+                    "This endpoint returns a binary PDF file; "
+                    "no JSON success envelope is returned.",
                     "",
                 ]
             )
         else:
-            lines.extend([note or "Response example unavailable.", ""])
+            sample, note = response_example(handler, method, components)
+            if sample is not None:
+                lines.extend(
+                    [
+                        f"HTTP `{success_status}`. IDs, dates, request IDs, and tokens below "
+                        "are illustrative; the token strings are not valid credentials.",
+                        "",
+                        "```json",
+                        json.dumps(sample, indent=2, ensure_ascii=False),
+                        "```",
+                        "",
+                    ]
+                )
+            else:
+                lines.extend([note or "Response example unavailable.", ""])
 
     lines.extend(
         [
@@ -798,8 +889,7 @@ def render_operation(
                 "default validation-error body."
             )
         lines.append(
-            f"| `{status}` | {markdown_text(response.get('description', '—'))} "
-            f"| {body_schema} |"
+            f"| `{status}` | {markdown_text(response.get('description', '—'))} | {body_schema} |"
         )
     lines.append("")
     if "422" in operation.get("responses", {}):
@@ -840,9 +930,7 @@ def render_component(name: str, schema: dict[str, Any]) -> list[str]:
         )
         for property_name, property_schema in properties.items():
             description = markdown_text(property_schema.get("description", "—"))
-            example = first_example(
-                property_schema.get("example", property_schema.get("examples"))
-            )
+            example = first_example(property_schema.get("example", property_schema.get("examples")))
             if example is not None:
                 description += f"; Example: `{markdown_text(example)}`"
             lines.append(
@@ -975,9 +1063,7 @@ def main() -> None:
                 json.dumps(
                     {
                         "success": False,
-                        "message": (
-                            "Service unavailable" if http_status == "503" else message
-                        ),
+                        "message": ("Service unavailable" if http_status == "503" else message),
                         "data": None,
                         "errors": [{"code": code, "message": message}],
                         "meta": {

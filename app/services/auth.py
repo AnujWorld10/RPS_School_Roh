@@ -124,6 +124,16 @@ class AuthService:
             raise AuthenticationException("Invalid email or password")
         if user.status != UserStatus.ACTIVE.value:
             raise AuthenticationException("User account is not active")
+        portal_roles = {
+            "student": {"STUDENT"},
+            "parent": {"PARENT"},
+            "teacher": {"TEACHER"},
+            "administration": {"ADMIN", "SUPER_ADMIN"},
+        }
+        if payload.portal is not None:
+            roles, _ = _collect_roles_and_permissions(user)
+            if not portal_roles[payload.portal].intersection(roles):
+                raise AuthenticationException("Invalid email or password")
 
         access_token = create_access_token(user_id=user.id)
         refresh_token, _jti = create_refresh_token(user_id=user.id)

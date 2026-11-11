@@ -53,3 +53,9 @@ class Class(Base, TimestampMixin, SoftDeleteMixin):
         back_populates="school_class",
         cascade="all, delete-orphan",
     )
+    admission_fee_structures: Mapped[list["AdmissionFeeStructure"]] = relationship(  # noqa: F821
+        back_populates="school_class",
+    )
+    monthly_fee_structures: Mapped[list["MonthlyFeeStructure"]] = relationship(  # noqa: F821
+        back_populates="school_class",
+    )

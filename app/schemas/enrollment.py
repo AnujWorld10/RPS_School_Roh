@@ -7,10 +7,12 @@ class EnrollmentResponse(BaseModel):
     """Result of successful enrollment from an approved admission."""
 
     student_id: int = Field(..., description="Internal ID of the newly enrolled student.")
-    student_code: str = Field(description="Business ID e.g. STU202600001")
+    student_code: str = Field(description="School-wide student ID, for example RPS00001.")
     admission_id: int = Field(..., description="Internal ID of the approved admission.")
     admission_code: str = Field(
-        ..., description="Business identifier of the admission.", examples=["ADM202600055"]
+        ...,
+        description="Admission ID shared with the enrolled student's RPS ID.",
+        examples=["RPS00001"],
     )
     inquiry_code: str = Field(
         ...,

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from fastapi import Request, UploadFile
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import BusinessRuleException, ConflictException, NotFoundException
 from app.core.pagination import PaginatedResult, PaginationParams
 from app.core.transactions import transaction
@@ -27,6 +28,7 @@ from app.repositories.inquiry_admissions import (
 from app.schemas.admissions import InquiryAdmissionCreateRequest, InquiryAdmissionUpdateRequest
 from app.services.audit import AuditService
 from app.services.inquiries import InquiryService
+from app.utils.admission_pii import encrypt_aadhaar
 from app.utils.business_ids import generate_admission_code
 from app.utils.file_storage import save_upload_file
 
@@ -66,6 +68,10 @@ class InquiryAdmissionService:
         school_class = self.classes.get_active(payload.class_id)
         if not school_class or school_class.status != ClassStatus.ACTIVE.value:
             raise NotFoundException("Class not found")
+        if payload.academic_year != school_class.academic_year:
+            raise BusinessRuleException(
+                "The selected academic year does not match the selected class."
+            )
 
         with transaction(self.session):
             admission = self.repo.create(
@@ -77,6 +83,25 @@ class InquiryAdmissionService:
                     academic_year=payload.academic_year,
                     status=AdmissionStatus.SUBMITTED.value,
                     permanent_address=payload.permanent_address or inquiry.address,
+                    student_aadhaar_encrypted=(
+                        encrypt_aadhaar(payload.student_aadhaar)
+                        if payload.student_aadhaar
+                        else None
+                    ),
+                    student_aadhaar_last4=(
+                        payload.student_aadhaar[-4:] if payload.student_aadhaar else None
+                    ),
+                    parent_aadhaar_encrypted=(
+                        encrypt_aadhaar(payload.parent_aadhaar)
+                        if payload.parent_aadhaar
+                        else None
+                    ),
+                    parent_aadhaar_last4=(
+                        payload.parent_aadhaar[-4:] if payload.parent_aadhaar else None
+                    ),
+                    last_school_marks=payload.last_school_marks,
+                    last_school_percentage=payload.last_school_percentage,
+                    last_school_id_or_roll_number=payload.last_school_id_or_roll_number,
                     temporary_address=payload.temporary_address,
                     nationality=payload.nationality,
                     disability=payload.disability,
@@ -106,6 +131,12 @@ class InquiryAdmissionService:
         admission = self.repo.get_with_documents(admission_id)
         if not admission:
             raise NotFoundException("Admission not found")
+        return admission
+
+    def get_public_admission(self, inquiry_id: int) -> InquiryAdmission:
+        admission = self.repo.get_for_public_status(inquiry_id)
+        if not admission:
+            raise NotFoundException("Admission application not found")
         return admission
 
     def list_admissions(
@@ -174,60 +205,64 @@ class InquiryAdmissionService:
             f"admissions/{admission_id}",
         )
 
-        with transaction(self.session):
-            admission = self.repo.get_with_documents(admission_id, for_update=True)
-            if not admission:
-                raise NotFoundException("Admission not found")
-            if admission.status == AdmissionStatus.REJECTED.value:
-                raise BusinessRuleException("Cannot upload documents for rejected admission")
-            if admission.student_id is not None:
-                raise BusinessRuleException("Cannot replace documents after enrollment")
+        try:
+            with transaction(self.session):
+                locked_admission = self.repo.get_with_documents(admission_id, for_update=True)
+                if not locked_admission:
+                    raise NotFoundException("Admission not found")
+                if locked_admission.status == AdmissionStatus.REJECTED.value:
+                    raise BusinessRuleException("Cannot upload documents for rejected admission")
+                if locked_admission.student_id is not None:
+                    raise BusinessRuleException("Cannot replace documents after enrollment")
 
-            existing = self.documents.get_by_admission_and_type(admission_id, document_type)
-            if existing:
-                existing.file_name = original_name
-                existing.file_path = relative_path
-                existing.mime_type = file.content_type
-                existing.verification_status = DocumentVerificationStatus.PENDING.value
-                existing.verified_by = None
-                existing.verified_at = None
-                existing.rejection_reason = None
-                doc = self.documents.update(existing)
-            else:
-                doc = self.documents.create(
-                    AdmissionDocument(
-                        admission_id=admission_id,
-                        document_type=document_type,
-                        file_name=original_name,
-                        file_path=relative_path,
-                        mime_type=file.content_type,
+                existing = self.documents.get_by_admission_and_type(admission_id, document_type)
+                if existing:
+                    existing.file_name = original_name
+                    existing.file_path = relative_path
+                    existing.mime_type = file.content_type
+                    existing.verification_status = DocumentVerificationStatus.PENDING.value
+                    existing.verified_by = None
+                    existing.verified_at = None
+                    existing.rejection_reason = None
+                    doc = self.documents.update(existing)
+                else:
+                    doc = self.documents.create(
+                        AdmissionDocument(
+                            admission_id=admission_id,
+                            document_type=document_type,
+                            file_name=original_name,
+                            file_path=relative_path,
+                            mime_type=file.content_type,
+                        )
                     )
+                if locked_admission.status in (
+                    AdmissionStatus.APPROVED.value,
+                    AdmissionStatus.DOCUMENT_VERIFICATION.value,
+                ):
+                    locked_admission.status = AdmissionStatus.DOCUMENT_PENDING.value
+                    locked_admission.approved_by = None
+                    locked_admission.approved_at = None
+                    self.repo.update(locked_admission)
+                    inquiry = self.inquiries.get_by_id_for_update(locked_admission.inquiry_id)
+                    if inquiry and inquiry.status == InquiryStatus.DOCUMENT_VERIFICATION.value:
+                        self.inquiry_service.transition_status(
+                            locked_admission.inquiry_id,
+                            InquiryStatus.DOCUMENT_PENDING.value,
+                            None,
+                            request,
+                            change_reason="Admission document replaced; re-verification required",
+                            manage_transaction=False,
+                        )
+                self.audit.log(
+                    action="admission.document.upload",
+                    entity_type="admission_document",
+                    entity_id=doc.id,
+                    request=request,
                 )
-            if admission.status in (
-                AdmissionStatus.APPROVED.value,
-                AdmissionStatus.DOCUMENT_VERIFICATION.value,
-            ):
-                admission.status = AdmissionStatus.DOCUMENT_PENDING.value
-                admission.approved_by = None
-                admission.approved_at = None
-                self.repo.update(admission)
-                inquiry = self.inquiries.get_by_id_for_update(admission.inquiry_id)
-                if inquiry and inquiry.status == InquiryStatus.DOCUMENT_VERIFICATION.value:
-                    self.inquiry_service.transition_status(
-                        admission.inquiry_id,
-                        InquiryStatus.DOCUMENT_PENDING.value,
-                        None,
-                        request,
-                        change_reason="Admission document replaced; re-verification required",
-                        manage_transaction=False,
-                    )
-            self.audit.log(
-                action="admission.document.upload",
-                entity_type="admission_document",
-                entity_id=doc.id,
-                request=request,
-            )
-            return doc
+                return doc
+        except Exception:
+            (get_settings().upload_path / relative_path).unlink(missing_ok=True)
+            raise
 
     def verify_document(
         self,
