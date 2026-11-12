@@ -47,6 +47,9 @@ const ClassesPage = lazy(() =>
 const SubjectsPage = lazy(() =>
   import('@/pages/subjects-page').then(({ SubjectsPage }) => ({ default: SubjectsPage })),
 )
+const AcademicsPage = lazy(() =>
+  import('@/pages/academics-page').then(({ AcademicsPage }) => ({ default: AcademicsPage })),
+)
 const InquiriesPage = lazy(() =>
   import('@/pages/inquiries-page').then(({ InquiriesPage }) => ({ default: InquiriesPage })),
 )
@@ -119,6 +122,7 @@ function App() {
           <Route element={<RequirePermission anyOf={['teachers.read']}><TeachersPage /></RequirePermission>} path="/teachers" />
           <Route element={<RequirePermission anyOf={['classes.read']}><ClassesPage /></RequirePermission>} path="/classes" />
           <Route element={<RequirePermission anyOf={['subjects.read']}><SubjectsPage /></RequirePermission>} path="/subjects" />
+          <Route element={<RequirePermission anyOf={['academics.subjects.manage']}><AcademicsPage /></RequirePermission>} path="/academics" />
           <Route
             element={
               <RequirePermission anyOf={['inquiries.read']}><InquiriesPage /></RequirePermission>

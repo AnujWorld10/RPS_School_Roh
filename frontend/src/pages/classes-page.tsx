@@ -40,6 +40,20 @@ function ClassFormDialog({
 }) {
   const queryClient = useQueryClient()
   const [formError, setFormError] = useState<string | null>(null)
+  const catalogQuery = useQuery({
+    queryKey: ['classes', 'catalog-inputs'],
+    queryFn: () => schoolApi.classes.list(
+      { page: 1, limit: 100, sort_by: 'name', sort_order: 'asc' },
+      {},
+    ),
+    enabled: open,
+  })
+  const catalogClasses = catalogQuery.data?.items ?? []
+  const gradeOptions = [...new Set(catalogClasses.map((item) => item.name))]
+  const sectionOptions = [...new Set(catalogClasses
+    .map((item) => item.section)
+    .filter((section): section is string => Boolean(section)))]
+  const yearOptions = [...new Set(catalogClasses.map((item) => item.academic_year))]
   const form = useForm<ClassFormValues>({
     resolver: zodResolver(classSchema),
     defaultValues: schoolClass
@@ -87,19 +101,41 @@ function ClassFormDialog({
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       ) : null}
+      {catalogQuery.error ? (
+        <ErrorState description={`Class suggestions are unavailable: ${toApiError(catalogQuery.error).message}`} />
+      ) : null}
       <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={form.handleSubmit((values) => {
         setFormError(null)
         mutation.mutate(values)
       })}>
         <FormField error={form.formState.errors.name?.message} label="Class or grade" required>
-          {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} {...form.register('name')} />}
+          {({ id, describedBy }) => (
+            <>
+              <Input id={id} list={`${id}-options`} aria-describedby={describedBy} {...form.register('name')} />
+              <datalist id={`${id}-options`}>
+                {gradeOptions.map((grade) => <option key={grade} value={grade} />)}
+              </datalist>
+            </>
+          )}
         </FormField>
         <FormField error={form.formState.errors.section?.message} label="Section">
-          {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} {...form.register('section')} />}
+          {({ id, describedBy }) => (
+            <>
+              <Input id={id} list={`${id}-options`} aria-describedby={describedBy} {...form.register('section')} />
+              <datalist id={`${id}-options`}>
+                {sectionOptions.map((section) => <option key={section} value={section} />)}
+              </datalist>
+            </>
+          )}
         </FormField>
         <FormField error={form.formState.errors.academic_year?.message} label="Academic year" required>
           {({ id, describedBy }) => (
-            <Input id={id} aria-describedby={describedBy} placeholder="2026-2027" {...form.register('academic_year')} />
+            <>
+              <Input id={id} list={`${id}-options`} aria-describedby={describedBy} placeholder="2026-2027" {...form.register('academic_year')} />
+              <datalist id={`${id}-options`}>
+                {yearOptions.map((year) => <option key={year} value={year} />)}
+              </datalist>
+            </>
           )}
         </FormField>
         <FormField error={form.formState.errors.capacity?.message} label="Student capacity" required>
@@ -353,6 +389,8 @@ function ClassManagementDialog({
 export function ClassesPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const [grade, setGrade] = useState('')
+  const [section, setSection] = useState('')
   const [academicYear, setAcademicYear] = useState('')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -361,11 +399,28 @@ export function ClassesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const catalogQuery = useQuery({
+    queryKey: ['classes', 'filter-options'],
+    queryFn: () => schoolApi.classes.list(
+      { page: 1, limit: 100, sort_by: 'name', sort_order: 'asc' },
+      {},
+    ),
+  })
+  const catalogClasses = catalogQuery.data?.items ?? []
+  const gradeOptions = [...new Set(catalogClasses.map((item) => item.name))]
+  const sectionOptions = [...new Set(catalogClasses.map((item) => item.section ?? '__no_section__'))]
+  const yearOptions = [...new Set(catalogClasses.map((item) => item.academic_year))].sort().reverse()
   const query = useQuery({
-    queryKey: ['classes', { academicYear, status, page, limit: 10 }],
+    queryKey: ['classes', { grade, section, academicYear, status, page, limit: 10 }],
     queryFn: () => schoolApi.classes.list(
       { page, limit: 10, sort_by: 'name', sort_order: 'asc' },
-      { academic_year: academicYear || undefined, status: status || undefined },
+      {
+        name: grade || undefined,
+        section: section && section !== '__no_section__' ? section : undefined,
+        section_is_null: section === '__no_section__' ? true : undefined,
+        academic_year: academicYear || undefined,
+        status: status || undefined,
+      },
     ),
   })
   const deleteMutation = useMutation({
@@ -447,32 +502,72 @@ export function ClassesPage() {
           pagination={query.data?.pagination}
           rows={query.data?.items ?? []}
           toolbar={
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <label className="sr-only" htmlFor="class-year">Filter by academic year</label>
-              <Input
-                className="h-10 max-w-sm"
-                id="class-year"
-                onChange={(event) => {
-                  setAcademicYear(event.target.value)
-                  setPage(1)
-                }}
-                placeholder="Filter academic year"
-                value={academicYear}
-              />
-              <label className="sr-only" htmlFor="class-status">Filter by status</label>
-              <select
-                className="h-10 rounded-lg border border-input bg-white px-3 text-sm"
-                id="class-status"
-                onChange={(event) => {
-                  setStatus(event.target.value)
-                  setPage(1)
-                }}
-                value={status}
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="grid gap-2 text-sm font-medium" htmlFor="class-grade">
+                Grade
+                <select
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm"
+                  id="class-grade"
+                  onChange={(event) => {
+                    setGrade(event.target.value)
+                    setPage(1)
+                  }}
+                  value={grade}
+                >
+                  <option value="">All grades</option>
+                  {gradeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium" htmlFor="class-section">
+                Section
+                <select
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm"
+                  id="class-section"
+                  onChange={(event) => {
+                    setSection(event.target.value)
+                    setPage(1)
+                  }}
+                  value={section}
+                >
+                  <option value="">All sections</option>
+                  {sectionOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item === '__no_section__' ? 'No section' : item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium" htmlFor="class-year">
+                Academic year
+                <select
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm"
+                  id="class-year"
+                  onChange={(event) => {
+                    setAcademicYear(event.target.value)
+                    setPage(1)
+                  }}
+                  value={academicYear}
+                >
+                  <option value="">All academic years</option>
+                  {yearOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium" htmlFor="class-status">
+                Status
+                <select
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm"
+                  id="class-status"
+                  onChange={(event) => {
+                    setStatus(event.target.value)
+                    setPage(1)
+                  }}
+                  value={status}
+                >
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
             </div>
           }
         />

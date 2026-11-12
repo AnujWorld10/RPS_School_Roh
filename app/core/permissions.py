@@ -69,6 +69,13 @@ DEFAULT_PERMISSIONS = [
     ("events.read", "events", "read"),
     ("events.update", "events", "update"),
     ("events.review", "events", "review"),
+    ("academics.subjects.manage", "academics", "subjects.manage"),
+    ("academics.examinations.manage", "academics", "examinations.manage"),
+    ("academics.marks.manage", "academics", "marks.manage"),
+    ("academics.marks.correct", "academics", "marks.correct"),
+    ("academics.results.read", "academics", "results.read"),
+    ("academics.grading.manage", "academics", "grading.manage"),
+    ("academics.electives.manage", "academics", "electives.manage"),
 ]
 
 ROLE_PERMISSION_MAP: dict[str, list[str]] = {
@@ -96,15 +103,12 @@ ROLE_PERMISSION_MAP: dict[str, list[str]] = {
         "students.read",
         "students.update",
         "teachers.read",
-        "subjects.create",
         "subjects.read",
-        "subjects.update",
         "inquiries.read",
         "inquiries.review",
         "interviews.read",
         "admissions.read",
         "admissions.approve",
-        "teaching_assignments.manage",
         "assignments.create",
         "assignments.read",
         "assignments.update",
@@ -153,6 +157,7 @@ ROLE_PERMISSION_MAP: dict[str, list[str]] = {
         "timetable.read",
         "assessments.read",
         "events.read",
+        "academics.results.read",
     ],
     "PARENT": [
         "inquiries.create",

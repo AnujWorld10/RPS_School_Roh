@@ -35,7 +35,7 @@ def _admission_candidate(db_session, client):
         status=InquiryStatus.INTERVIEW_PASS.value,
     )
     school_class = Class(
-        name=f"Parent Admission {suffix[-6:]}",
+        name="Grade 5",
         section="A",
         academic_year="2026-2027",
         capacity=30,
@@ -65,6 +65,7 @@ def _admission_candidate(db_session, client):
         .filter(InquiryAdmission.inquiry_id == inquiry.id)
         .one()
     )
+    assert admission.section is None
     return inquiry, school_class, admission
 
 
@@ -107,7 +108,12 @@ def test_parent_submits_encrypted_details_documents_and_receives_admission_lette
         "parent_mobile": inquiry.parent_mobile,
     }
     document_id = None
-    for document_type in DocumentType:
+    for document_type in (
+        DocumentType.PROGRESS_REPORT,
+        DocumentType.TRANSFER_CERTIFICATE,
+        DocumentType.STUDENT_AADHAR,
+        DocumentType.PARENT_AADHAR,
+    ):
         uploaded = client.post(
             "/api/v1/public/student/admission/documents",
             data={**credentials, "document_type": document_type.value},
@@ -130,6 +136,13 @@ def test_parent_submits_encrypted_details_documents_and_receives_admission_lette
                 .id
             )
 
+    optional_upload = client.post(
+        "/api/v1/public/student/admission/documents",
+        data={**credentials, "document_type": DocumentType.MIGRATION_CERTIFICATE.value},
+        files={"file": ("migration.pdf", b"%PDF-1.4 optional", "application/pdf")},
+    )
+    assert optional_upload.status_code == 201, optional_upload.text
+
     assert document_id is not None
     file_response = client.get(
         f"/api/v1/documents/{document_id}/file",
@@ -140,6 +153,8 @@ def test_parent_submits_encrypted_details_documents_and_receives_admission_lette
     assert file_response.headers["content-disposition"] == "inline"
 
     for document in admission.documents:
+        if document.document_type == DocumentType.MIGRATION_CERTIFICATE.value:
+            continue
         verified = client.post(
             f"/api/v1/documents/{document.id}/verify",
             params={"verified": True},
@@ -152,12 +167,25 @@ def test_parent_submits_encrypted_details_documents_and_receives_admission_lette
         headers=auth_headers,
     )
     assert approved.status_code == 200, approved.text
+    enrollment_section = Class(
+        name=school_class.name,
+        section="B",
+        academic_year="2025-2026",
+        capacity=30,
+        status=ClassStatus.ACTIVE.value,
+    )
+    db_session.add(enrollment_section)
+    db_session.commit()
     enrolled = client.post(
         f"/api/v1/inquiry-admissions/{admission.id}/enroll",
         headers=auth_headers,
+        json={"class_id": enrollment_section.id},
     )
     assert enrolled.status_code == 201, enrolled.text
     student_code = enrolled.json()["data"]["student_code"]
+    assert enrolled.json()["data"]["section"] == "B"
+    assert enrolled.json()["data"]["class_id"] == enrollment_section.id
+    assert enrolled.json()["data"]["academic_year"] == "2025-2026"
 
     status_response = client.get(
         f"/api/v1/public/student/inquiry/status/{inquiry.inquiry_code}",
@@ -171,6 +199,8 @@ def test_parent_submits_encrypted_details_documents_and_receives_admission_lette
     assert public_status["status"] == InquiryStatus.ADMISSION_SUCCESS.value
     assert public_status["admission"]["student_code"] == student_code
     assert public_status["admission"]["class_name"] == school_class.name
+    assert public_status["admission"]["section"] == "B"
+    assert public_status["admission"]["academic_year"] == "2025-2026"
     assert "012345678901" not in str(public_status)
     assert "987654321098" not in str(public_status)
 

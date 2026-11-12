@@ -13,6 +13,7 @@
 > - JWT authentication + RBAC authorization  
 > - daily file logging in `logs/` (including error-only logs + retention)  
 > - inquiry → interview → admission → document verification → enrollment workflow
+> - class curriculum, electives, examinations, grading, and published student results
 
 > This repository previously contained design proposals and historical test and implementation
 > reports. Their unverified or superseded details are not current specifications; current
@@ -75,7 +76,7 @@ The system is designed for:
 | Audit | Log state-changing operations |
 | Operations | Classes, subjects, students, teachers (profile, attendance, salary) |
 
-**Planned (not yet implemented):** Career/HR hiring module, results, academic sessions as first-class entities, notifications, fee management.
+**Planned (not yet implemented):** Career/HR hiring module, academic sessions as first-class entities, notifications, fee management.
 
 ### 1.3 Main Modules
 
@@ -87,7 +88,7 @@ The system is designed for:
 | **Interviews** | Schedule, list, record results |
 | **Admissions** | Inquiry-linked admission, documents, approve, enroll |
 | **Classes** | CRUD, capacity, class teacher, subject offerings, readiness, soft delete |
-| **Subjects** | Subject catalog CRUD, search, activation/deactivation |
+| **Subjects & results** | Subject catalog, class/year offerings, teacher assignment, elective selection, examinations, marks, grading, publication, corrections, student results |
 | **Students** | CRUD, status, class assignment, soft delete |
 | **Teachers** | Profile, legacy subject/class links, class-scoped subject teaching, attendance, salary payments |
 | **Core** | Config, security, logging, middleware, responses, exceptions |
@@ -375,6 +376,7 @@ SCHOOL_MANAGEMENT/
 │   │       ├── classes/
 │   │       ├── students/
 │   │       └── teachers/
+│   │       └── academics/        # Class offerings, elective, exam, marks, and results APIs
 │   ├── core/                     # Cross-cutting concerns
 │   │   ├── config.py             # Pydantic settings (env-driven)
 │   │   ├── security.py           # JWT, password hashing, token helpers
@@ -492,6 +494,12 @@ python scripts/cleanup_logs.py
 | `008_duplicate_key` | `008_inquiry_duplicate_key.py` | Add nullable inquiry identity hash and unique duplicate guard |
 | `009_reconcile_orm` | `009_reconcile_orm_schema.py` | Reconcile legacy schema with current ORM and add operational tables/constraints |
 | `010_subject_academic_map` | `010_subject_class_academic_mappings.py` | Add designated class teachers, class subject offerings, class-scoped teacher teaching assignments, and subject-management permissions |
+| `011_student_contact_fields` | `011_student_contact_fields.py` | Add student contact fields |
+| `012_role_portal_academics` | `012_role_portal_academics.py` | Add portal and academic workflow permissions |
+| `013_fee_structures` | `013_fee_structures.py` | Add class/year fee structure records |
+| `014_student_portal` | `014_student_portal.py` | Add student portal account links and ID sequencing |
+| `015_admission_details` | `015_admission_details.py` | Add admission workflow details |
+| `016_subject_results_management` | `016_subject_results_management.py` | Add elective selections, configurable class offerings, examination components and marks, grading rules, results, and academic permissions |
 
 #### Migration Safety Notes (Important)
 
@@ -744,7 +752,7 @@ stateDiagram-v2
 ### 9.3 Admission & Document Workflow
 
 1. After `INTERVIEW_PASS`, submit admission (public or staff)
-2. Upload 6 required document types
+2. Upload 4 required document types; migration and character certificates are optional
 3. Staff verifies each document
 4. When all verified → inquiry `DOCUMENT_VERIFICATION`, admission ready
 5. Staff approves admission → `APPROVED`
@@ -772,14 +780,16 @@ stateDiagram-v2
   as a duplicate; this requires a separate identity policy if it must be supported.
 - An admission can be opened only after `INTERVIEW_PASS`. Creating it sets the admission
   to `submitted` and moves the inquiry to `DOCUMENT_PENDING`.
-- The six required document types are `progress_report`, `transfer_certificate`,
-  `migration_certificate`, `character_certificate`, `student_aadhar`, and `parent_aadhar`.
-  All six must be uploaded and verified before the admission can be approved. Replacing a
-  document resets its verification and may return the workflow to document pending.
-- Enrollment requires an approved admission, all six documents verified, an active target
-  class that is academically ready, and available class capacity. Enrollment creates the
-  student and class/year roll number, links the student to the admission, and moves the
-  inquiry to `ADMISSION_SUCCESS`.
+- The four required document types are `progress_report`, `transfer_certificate`,
+  `student_aadhar`, and `parent_aadhar`. Migration and character certificates may be uploaded
+  but are optional. All required documents must be uploaded and verified before admission
+  approval. Replacing a document resets its verification and may return the workflow to
+  document pending.
+- Enrollment requires an approved admission, all required documents verified, an active target
+  class that is academically ready, and available class capacity. The parent-provided admission
+  does not assign a section; staff select the target section during enrollment. Enrollment
+  creates the student and class/year roll number, links the student to the admission, and moves
+  the inquiry to `ADMISSION_SUCCESS`.
 - `INTERVIEW_FAIL`, `REJECTED`, and `ADMISSION_SUCCESS` are locked states for edits to the
   original inquiry. Reapplication, when allowed by the duplicate-key rule above, is a new
   inquiry rather than an edit to that locked record.
@@ -904,12 +914,11 @@ API deliberately returns null for paid/pending balances, due dates, and payment 
 Monthly fee PDF download responds with `501 FEE_BILLING_UNAVAILABLE` until those ledger
 records exist; it does not generate a document with invented payment information.
 
-Teacher roles receive explicit student, inquiry-review, admission-approval, subject-catalog,
-assignment, assessment, timetable, and event permissions. Teachers may edit student records
-across the configured school scope. Teacher class/subject mapping endpoints allow a teacher
-to add or remove only their own mapping to an already existing class-subject offering; they
-cannot modify another teacher's mappings. Admin-managed class offerings and other teacher
-mappings remain protected by their existing permissions.
+Teacher roles retain explicit student, inquiry-review, admission-approval, assignment,
+assessment, timetable, and event permissions. Teachers may edit student records across the
+configured school scope. The centralized academic-management API is restricted to
+administrators; its class offerings, teacher assignments, elective selections, examinations,
+grading, mark entry, and result publication use the dedicated `academics.*` permissions.
 
 Assignments begin as drafts and are visible to students/parents only after publication.
 Optional assignment files reuse the configured upload directory, extension allowlist, and
@@ -953,12 +962,10 @@ The existing `teacher_subjects` table and `POST /api/v1/teachers/{teacher_id}/su
 remain for compatibility with older global teacher/subject links. They do not replace the
 new class-scoped teaching assignment and should not be used to determine a class timetable.
 
-Students inherit the active subjects offered to their enrolled class through `class_id`;
-`GET /api/v1/students/{student_id}/subjects` returns those offerings. The current project has
-no elective-selection workflow, so student-specific subject choices are not stored separately.
-Removing a class offering is blocked while active students are enrolled, and a subject cannot
-be deactivated while it is offered to an active class. Readiness is computed from current
-relationships rather than stored as a boolean, avoiding stale readiness flags.
+Students inherit active mandatory subjects offered to their enrolled class through `class_id`.
+Elective selections are stored per student, class, and subject; the administration-managed
+selection is exposed to the authenticated student through `/api/v1/academics/students/me/subjects`.
+The original class readiness and enrollment constraints continue to apply.
 
 Setup sequence:
 
@@ -969,12 +976,32 @@ Setup sequence:
 5. Assign teaching responsibility with `POST /api/v1/teachers/{teacher_id}/class-subjects`.
 6. Confirm class readiness before enrolling or assigning active students.
 
-Creating subjects requires `subjects.create`; listing and retrieving them requires
-`subjects.read`. Code/name updates and reactivation require `subjects.update`, while soft
-deactivation requires `subjects.delete`. Class curriculum and class-teacher assignments use
-`classes.update`; teacher teaching assignments use `teachers.update`. Migration 010 grants
-the new subject permissions to existing `ADMIN` and `SUPER_ADMIN` roles; the normal seed
-routine also includes them for fresh installations.
+The existing subject API permissions control catalog CRUD. Academic offerings, assignments,
+elective selections, examinations, marks, grading rules, and results use the dedicated
+`academics.*` permissions introduced by migration 016; these management permissions are
+granted to `ADMIN` and `SUPER_ADMIN`, while students receive read access only to their own
+subjects and published results.
+
+### 9.7 Academic management and results
+
+The administration academic workspace manages offerings by existing class records, which
+already include section and academic year. It configures each offering as mandatory, elective,
+or optional; maps active teachers; and records student elective choices. Student subject and
+result endpoints resolve the student from the authenticated account and do not accept a
+caller-supplied student ID.
+
+Examinations are created as drafts with a class, date range, type, subjects, and one or more
+theory, practical, internal, or combined mark components. Scheduling is explicit. Marks are
+validated against component limits and active class membership. Publication requires all
+applicable marks, computes aggregate percentages, pass/fail status, and a grade from the
+configurable grading scale. Corrections to published marks require a reason and are audited.
+Students can read only their published results; examination setup, mark entry, publication,
+and correction remain administration-managed.
+
+The default grading bands are seeded as editable starting values, not school policy. Confirm
+and configure the grading thresholds to match the school before publishing official results.
+The existing teacher assessment workflow remains available separately for teacher-managed
+class assessments.
 
 ---
 
@@ -1415,8 +1442,10 @@ rate limiting is configured at ingress; password recovery is not implemented.
 
 ## 19. Future Enhancements
 
-- **Not implemented:** Career/HR hiring, academic sessions/sections, student attendance,
-  results/report cards, fees, notifications, and parent/student portals.
+- **Not implemented:** Career/HR hiring, academic sessions as first-class entities, student
+  attendance, fee collection, and notifications. Student and parent portals exist, but
+  parent-facing inquiry/admission and student published-result workflows are not a complete
+  self-service school portal.
 - **Operational improvements under consideration:** Redis caching, a background job system,
   object storage, password recovery, API rate limiting inside the application, and social
   login. Public endpoint rate limiting is currently an ingress responsibility.
@@ -1563,7 +1592,7 @@ monitoring.
 | Database schema | Snapshot generated | Compare [the database reference](database-schema-reference.md) with the target database after migrations; resolve model/database differences before relying on ORM fields. |
 | Configuration and secrets | Environment-specific | Set required environment variables securely; use strong production secrets and never copy example credentials into deployment settings. |
 | Migrations and seeding | Environment-specific | Apply Alembic migrations as a release step. Run seeding only when intended; configure both initial-admin values to create the bootstrap administrator. |
-| Inquiry-to-enrollment flow | Source reviewed | Test duplicate inquiry handling, interview outcomes, all six document uploads and verifications, approval, active-class capacity, and resulting student/roll assignment. |
+| Inquiry-to-enrollment flow | Source reviewed | Test duplicate inquiry handling, interview outcomes, required and optional document uploads and verifications, approval, active-class capacity, and resulting student/roll assignment. |
 | File upload controls | Documented limitation | Confirm configured extension/size limits and private storage behavior; malware scanning and MIME-signature verification are not implemented by the application. |
 | Authentication and authorization | Source documented | Verify login/token lifecycle and expected role/permission access using deployment-specific accounts. |
 | Tests and deployment smoke checks | Run per release | Execute CI tests, then verify health/readiness, database connectivity, API docs, and representative protected/public routes in the target environment. |

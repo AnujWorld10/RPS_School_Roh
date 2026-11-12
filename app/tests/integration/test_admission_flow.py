@@ -278,7 +278,7 @@ def test_admin_can_paginate_admissions(client, auth_headers):
         assert "page" in body["pagination"] or "total" in body["pagination"]
 
 
-def test_required_documents_lists_all_types(client):
+def test_required_documents_lists_required_types_and_excludes_optional(client):
     """
     GET /admissions/documents/required lists all required document types.
     """
@@ -287,9 +287,12 @@ def test_required_documents_lists_all_types(client):
     body = response.json()
     assert body["success"] is True
     data = body["data"]
-    # Should include document types like progress_report, transfer_certificate, etc.
-    # At least some types should be present
-    assert isinstance(data, (dict, list))
+    assert data["required"] == [
+        "parent_aadhar",
+        "progress_report",
+        "student_aadhar",
+        "transfer_certificate",
+    ]
 
 
 def test_inquiry_update_with_valid_credentials_succeeds(client):

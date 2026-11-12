@@ -142,7 +142,7 @@ class InterviewResultUpdate(StrEnum):
 
 
 class DocumentType(StrEnum):
-    """Required admission document types per FRD."""
+    """Supported admission document types."""
 
     PROGRESS_REPORT = "progress_report"
     TRANSFER_CERTIFICATE = "transfer_certificate"
@@ -152,7 +152,20 @@ class DocumentType(StrEnum):
     PARENT_AADHAR = "parent_aadhar"
 
 
-REQUIRED_ADMISSION_DOCUMENTS: frozenset[str] = frozenset(d.value for d in DocumentType)
+REQUIRED_ADMISSION_DOCUMENTS: frozenset[str] = frozenset(
+    {
+        DocumentType.PROGRESS_REPORT.value,
+        DocumentType.TRANSFER_CERTIFICATE.value,
+        DocumentType.STUDENT_AADHAR.value,
+        DocumentType.PARENT_AADHAR.value,
+    }
+)
+OPTIONAL_ADMISSION_DOCUMENTS: frozenset[str] = frozenset(
+    {
+        DocumentType.MIGRATION_CERTIFICATE.value,
+        DocumentType.CHARACTER_CERTIFICATE.value,
+    }
+)
 
 
 class DocumentVerificationStatus(StrEnum):

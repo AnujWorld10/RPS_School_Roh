@@ -46,12 +46,31 @@ def list_classes(
         description="Filter by academic year.",
         examples=["2026-2027"],
     ),
+    name: str | None = Query(
+        default=None,
+        description="Filter by grade or class name.",
+    ),
+    section: str | None = Query(
+        default=None,
+        description="Filter by section.",
+    ),
+    section_is_null: bool = Query(
+        default=False,
+        description="Filter for classes without a section.",
+    ),
     status: Annotated[
         ClassStatus | None,
         Query(description="Filter by class state: active or inactive."),
     ] = None,
 ):
-    result = ClassService(db).list_classes(params, academic_year, status)
+    result = ClassService(db).list_classes(
+        params,
+        academic_year,
+        status,
+        name,
+        section,
+        section_is_null,
+    )
     data = [ClassResponse.model_validate(item).model_dump() for item in result.items]
     return paginated_response(
         "Classes fetched successfully",

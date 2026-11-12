@@ -36,10 +36,19 @@ class ClassRepository(BaseRepository[Class]):
         params: PaginationParams,
         academic_year: str | None = None,
         status: str | None = None,
+        name: str | None = None,
+        section: str | None = None,
+        section_is_null: bool = False,
     ) -> PaginatedResult:
         stmt = select(Class).where(Class.deleted_at.is_(None))
         if academic_year:
             stmt = stmt.where(Class.academic_year == academic_year)
+        if name:
+            stmt = stmt.where(Class.name == name)
+        if section_is_null:
+            stmt = stmt.where(Class.section.is_(None))
+        elif section is not None:
+            stmt = stmt.where(Class.section == section)
         if status:
             stmt = stmt.where(Class.status == status)
         return self.paginate(stmt, params)

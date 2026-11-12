@@ -67,8 +67,18 @@ class ClassService:
         params: PaginationParams,
         academic_year: str | None = None,
         status: str | None = None,
+        name: str | None = None,
+        section: str | None = None,
+        section_is_null: bool = False,
     ) -> PaginatedResult:
-        return self.repo.list_filtered(params, academic_year, status)
+        return self.repo.list_filtered(
+            params,
+            academic_year,
+            status,
+            name,
+            section,
+            section_is_null,
+        )
 
     def get_class(self, class_id: int) -> Class:
         school_class = self.repo.get_active(class_id)
@@ -89,7 +99,7 @@ class ClassService:
 
     def list_subjects(self, class_id: int):
         self.get_class(class_id)
-        return self.class_subjects.list_for_class(class_id)
+        return self.class_subjects.list_for_class(class_id, active_only=True)
 
     def assign_subject(
         self,
@@ -106,7 +116,7 @@ class ClassService:
                 subject = self.subjects.get_for_update(subject_id)
                 if not subject or not subject.is_active:
                     raise NotFoundException("Active subject not found")
-                if self.class_subjects.has_offering(class_id, subject_id):
+                if self.class_subjects.has_active_offering(class_id, subject_id):
                     raise ConflictException("Subject is already assigned to this class")
                 self.class_subjects.add(class_id, subject_id)
                 self.audit.log(

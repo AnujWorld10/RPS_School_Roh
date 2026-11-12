@@ -1,8 +1,9 @@
 # School Management System API
 
-A FastAPI backend for school admissions and core school operations. It supports public
-student inquiries, staff review and interviews, admission documents, enrollment, classes,
-students, teachers, attendance, salary payments, authentication, and role-based permissions.
+A FastAPI backend for school admissions, class curriculum, and examination results. It
+supports public student inquiries, staff review and interviews, admission documents,
+enrollment, classes, subjects, teachers, attendance, salary payments, authentication, and
+role-based permissions.
 
 The API contract is available at `/docs` and `/openapi.json` when the service is running.
 See the [technical guide](docs/technical-documentation.md) for architecture and operations,
@@ -93,7 +94,7 @@ database and upload behavior in the target environment as well.
 
 The React application lives in `frontend/` and is a standalone Vite project. It uses the
 backend bearer-token authentication API and supports teacher, class, subject, student,
-inquiry, interview, admission, and admission-document workflows.
+inquiry, interview, admission, admission-document, and academic results workflows.
 
 Install Node.js LTS, then from the repository root:
 
@@ -128,7 +129,8 @@ requires signing in again. The school modules load and update records through th
 - Interviews: schedule and record results from an inquiry's interview history. The backend
   has no global interview list, so an inquiry must be selected first.
 - Admissions: list and edit inquiry-linked applications, review/reject/approve, enroll approved
-  applications, and upload/verify the six required document types.
+  applications, and upload/verify four required document types; migration and character
+  certificates are optional.
 - Dashboard: permission-scoped counts and admission-status totals from
   `GET /api/v1/dashboard/summary`, plus recent inquiries from the inquiry-list API.
   Upcoming interviews show the count and next five schedules in the configured

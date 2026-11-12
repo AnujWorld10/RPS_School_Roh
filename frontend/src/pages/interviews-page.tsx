@@ -227,6 +227,7 @@ export function InterviewsPage() {
   const columns = [
     { id: 'code', header: 'Inquiry code', cell: (item: Inquiry) => item.inquiry_code },
     { id: 'student', header: 'Student', cell: (item: Inquiry) => `${item.first_name} ${item.last_name}` },
+    { id: 'class', header: 'Grade / class', cell: (item: Inquiry) => item.admission_for_class || 'Not specified' },
     { id: 'status', header: 'Inquiry status', cell: (item: Inquiry) => item.status },
     { id: 'action', header: 'Interviews', cell: (item: Inquiry) => (
       <Button onClick={() => setSelectedInquiryId(item.id)} size="sm" variant="outline">
@@ -242,6 +243,7 @@ export function InterviewsPage() {
         title="Interviews"
       />
       <RecordList
+        caption="Inquiries available for interview"
         columns={columns}
         emptyMessage="No inquiries match these filters."
         error={query.error ? toApiError(query.error).message : undefined}
@@ -252,11 +254,11 @@ export function InterviewsPage() {
         pagination={query.data?.pagination}
         rows={query.data?.items ?? []}
         toolbar={
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SearchField label="Search inquiries" onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search name, code, email, or mobile" value={search} />
-            <label className="grid gap-2 text-sm font-medium" htmlFor="interview-inquiry-status">
+          <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2">
+            <SearchField label="Search inquiries" onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search name, code, email, or mobile" showLabel value={search} />
+            <label className="grid min-w-0 gap-2 text-sm font-medium" htmlFor="interview-inquiry-status">
               Filter inquiries by status
-              <select className="h-10 rounded-lg border border-input bg-white px-3 text-sm" id="interview-inquiry-status" onChange={(event) => { setStatus(event.target.value as InquiryStatus | ''); setPage(1) }} value={status}>
+              <select className="h-10 w-full min-w-0 rounded-lg border border-input bg-white px-3 text-sm" id="interview-inquiry-status" onChange={(event) => { setStatus(event.target.value as InquiryStatus | ''); setPage(1) }} value={status}>
                 <option value="">All statuses</option>
                 {statusOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.academics import routes as academics_routes
 from app.api.v1.admissions import routes as admissions_routes
 from app.api.v1.auth import routes as auth_routes
 from app.api.v1.classes import routes as classes_routes
@@ -15,6 +16,7 @@ from app.api.v1.teachers import routes as teachers_routes
 
 api_router = APIRouter()
 api_router.include_router(public_router, prefix="/public", tags=["public"])
+api_router.include_router(academics_routes.router)
 api_router.include_router(role_portal_routes.router, tags=["role portals"])
 api_router.include_router(auth_routes.router, prefix="/auth", tags=["auth"])
 api_router.include_router(classes_routes.router, prefix="/classes", tags=["classes"])

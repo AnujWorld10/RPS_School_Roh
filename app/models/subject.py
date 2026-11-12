@@ -1,9 +1,12 @@
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
+    Numeric,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,18 +16,35 @@ from app.db.base import BIGINT_PK, Base
 
 class Subject(Base):
     __tablename__ = "subjects"
-    __table_args__ = {"comment": "School subject catalog"}
+    __table_args__ = (
+        CheckConstraint(
+            "subject_type IN ('mandatory', 'elective', 'optional')",
+            name="ck_subjects_subject_type",
+        ),
+        {"comment": "School subject catalog"},
+    )
 
     id: Mapped[int] = mapped_column(BIGINT_PK, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    subject_type: Mapped[str] = mapped_column(String(20), default="mandatory", nullable=False)
+    max_marks: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    passing_marks: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     class_assignments: Mapped[list["ClassSubject"]] = relationship(back_populates="subject")
 
 
 class ClassSubject(Base):
     __tablename__ = "class_subjects"
-    __table_args__ = {"comment": "Subjects offered to each class"}
+    __table_args__ = (
+        CheckConstraint(
+            "subject_type IN ('mandatory', 'elective', 'optional')",
+            name="ck_class_subjects_subject_type",
+        ),
+        {"comment": "Subjects offered to each class"},
+    )
 
     class_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -36,6 +56,9 @@ class ClassSubject(Base):
         ForeignKey("subjects.id", ondelete="CASCADE", name="fk_class_subjects_subject"),
         primary_key=True,
     )
+    subject_type: Mapped[str] = mapped_column(String(20), default="mandatory", nullable=False)
+    stream: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     school_class: Mapped["Class"] = relationship(back_populates="subject_assignments")  # noqa: F821
     subject: Mapped[Subject] = relationship(back_populates="class_assignments")
@@ -88,5 +111,6 @@ class TeacherClassSubject(Base):
         ),
         primary_key=True,
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     teacher: Mapped["Teacher"] = relationship(back_populates="class_subject_assignments")  # noqa: F821

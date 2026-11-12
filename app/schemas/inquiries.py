@@ -265,10 +265,10 @@ class PublicAdmissionSummary(BaseModel):
         description="Admission workflow status, if an application exists.",
     )
     documents_uploaded: int = Field(
-        default=0, description="Number of admission documents uploaded."
+        default=0, description="Number of required admission documents uploaded."
     )
     documents_required: int = Field(
-        default=6, description="Number of required admission documents."
+        default=4, description="Number of required admission documents."
     )
     documents: list["PublicAdmissionDocumentSummary"] = Field(
         default_factory=list,
@@ -305,6 +305,7 @@ class PublicInquiryStatusResponse(BaseModel):
     inquiry_code: str = Field(
         ..., description="Public inquiry tracking code.", examples=["INQ202600007"]
     )
+    student_name: str = Field(..., description="Student's full name from the verified inquiry.")
     status: str = Field(..., description="Current admission inquiry status.")
     rejection_reason: str | None = Field(
         default=None,

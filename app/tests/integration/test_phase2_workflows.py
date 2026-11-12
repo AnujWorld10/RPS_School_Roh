@@ -332,6 +332,48 @@ def test_class_rename_uses_existing_academic_year(db_session):
     assert updated.academic_year == "2026-2027"
 
 
+def test_class_list_filters_grade_section_year_status_and_missing_section(db_session):
+    class_a = Class(
+        name="Phase Two Filter Grade",
+        section="A",
+        academic_year="2026-2027",
+        capacity=20,
+        status="active",
+    )
+    class_b = Class(
+        name="Phase Two Filter Grade",
+        section="B",
+        academic_year="2026-2027",
+        capacity=20,
+        status="inactive",
+    )
+    class_without_section = Class(
+        name="Phase Two Filter Grade",
+        section=None,
+        academic_year="2025-2026",
+        capacity=20,
+        status="active",
+    )
+    db_session.add_all([class_a, class_b, class_without_section])
+    db_session.flush()
+
+    filtered = ClassService(db_session).list_classes(
+        PaginationParams(limit=100),
+        academic_year="2026-2027",
+        status="active",
+        name="Phase Two Filter Grade",
+        section="A",
+    )
+    without_section = ClassService(db_session).list_classes(
+        PaginationParams(limit=100),
+        name="Phase Two Filter Grade",
+        section_is_null=True,
+    )
+
+    assert [item.id for item in filtered.items] == [class_a.id]
+    assert [item.id for item in without_section.items] == [class_without_section.id]
+
+
 def test_principal_can_start_inquiry_review(client, db_session):
     principal = _create_user_with_role(
         db_session,

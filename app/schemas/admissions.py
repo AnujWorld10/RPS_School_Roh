@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.enums import DocumentType
+from app.models.enums import DocumentType, REQUIRED_ADMISSION_DOCUMENTS
 from app.schemas.common import ORMModel
 
 
@@ -13,7 +13,11 @@ class InquiryAdmissionCreateRequest(BaseModel):
     """Submit admission application after interview pass (staff or verified parent)."""
 
     class_id: int = Field(..., gt=0, description="Target class catalog ID.", examples=[1])
-    section: str | None = Field(default=None, max_length=20, description="Requested class section.")
+    section: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Class section assigned by staff during enrollment.",
+    )
     academic_year: str = Field(
         ...,
         min_length=4,
@@ -336,10 +340,9 @@ class RequiredDocumentsResponse(BaseModel):
     """Checklist of required document types."""
 
     required: list[str] = Field(
-        default_factory=lambda: sorted(document_type.value for document_type in DocumentType),
+        default_factory=lambda: sorted(REQUIRED_ADMISSION_DOCUMENTS),
         description=(
             "Required document categories: progress_report, transfer_certificate, "
-            "migration_certificate, character_certificate, student_aadhar, and parent_aadhar "
-            "(student and parent Aadhaar documents)."
+            "student_aadhar, and parent_aadhar. Migration and character certificates are optional."
         ),
     )

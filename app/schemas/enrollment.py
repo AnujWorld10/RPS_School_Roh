@@ -3,6 +3,12 @@
 from pydantic import BaseModel, Field
 
 
+class EnrollmentRequest(BaseModel):
+    """Staff-selected class section for an approved admission."""
+
+    class_id: int = Field(..., gt=0, description="Active class/section selected for enrollment.")
+
+
 class EnrollmentResponse(BaseModel):
     """Result of successful enrollment from an approved admission."""
 

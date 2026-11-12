@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { PermissionGate } from '@/components/auth/permission-gate'
+import { ClassRecordSelector } from '@/components/school/class-record-selector'
 import { FormDialog } from '@/components/school/form-dialog'
 import { RecordList } from '@/components/school/record-list'
 import { StatusBadge } from '@/components/school/status-badge'
@@ -15,7 +16,6 @@ import { FormField } from '@/components/ui/form-field'
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { SearchField } from '@/components/ui/search-field'
-import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toApiError } from '@/lib/api/api-error'
 import { useAuth } from '@/features/auth/auth-context'
@@ -324,14 +324,10 @@ function StudentEnrollmentDialog({
             <ErrorState description={toApiError(activeClassesQuery.error).message} onRetry={() => void activeClassesQuery.refetch()} />
           ) : (
             <>
-              <SearchableSelect
-                label="Active class"
-                onChange={setClassId}
-                options={(activeClassesQuery.data?.items ?? []).map((item) => ({
-                  value: String(item.id),
-                  label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-                }))}
-                value={classId}
+              <ClassRecordSelector
+                classes={activeClassesQuery.data?.items ?? []}
+                labelPrefix="Active class"
+                onChange={(_, schoolClass) => setClassId(schoolClass ? String(schoolClass.id) : '')}
               />
               {selectedClass ? (
                 <p className="text-xs text-slate-500">Academic year sent to the API: {selectedClass.academic_year}</p>
@@ -541,17 +537,13 @@ export function StudentsPage() {
               ) : classesQuery.error ? (
                 <span className="text-sm text-destructive">Class filters unavailable: {toApiError(classesQuery.error).message}</span>
               ) : (
-                <SearchableSelect
-                  label="Filter by class"
-                  onChange={(value) => {
-                    setClassId(value)
+                <ClassRecordSelector
+                  classes={classesQuery.data?.items ?? []}
+                  labelPrefix="Filter"
+                  onChange={(_, schoolClass) => {
+                    setClassId(schoolClass ? String(schoolClass.id) : '')
                     setPage(1)
                   }}
-                  options={(classesQuery.data?.items ?? []).map((item) => ({
-                    value: String(item.id),
-                    label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-                  }))}
-                  value={classId}
                 />
               )}
             </div>

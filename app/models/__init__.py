@@ -1,5 +1,14 @@
 """SQLAlchemy ORM models — import all models for Alembic autogenerate."""
 
+from app.models.academics import (
+    Examination,
+    ExaminationComponent,
+    ExaminationResult,
+    ExaminationSubject,
+    GradingRule,
+    StudentMark,
+    StudentSubjectSelection,
+)
 from app.models.admission import AdmissionDocument, InquiryAdmission, StudentAdmission
 from app.models.audit_log import AuditLog
 from app.models.business_id_sequence import BusinessIDSequence
@@ -70,4 +79,11 @@ __all__ = [
     "Assessment",
     "AssessmentResult",
     "SchoolEvent",
+    "StudentSubjectSelection",
+    "Examination",
+    "ExaminationSubject",
+    "ExaminationComponent",
+    "StudentMark",
+    "GradingRule",
+    "ExaminationResult",
 ]
