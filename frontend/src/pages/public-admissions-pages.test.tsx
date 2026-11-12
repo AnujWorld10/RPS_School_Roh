@@ -10,6 +10,7 @@ import { rolePortalApi, type SchoolEvent } from '@/features/school/role-portal-a
 
 const publicStatus: PublicInquiryStatus = {
   inquiry_code: 'INQ202600010',
+  student_name: 'Taylor Example',
   status: 'INTERVIEW_PASS',
   rejection_reason: null,
   admission_for_class: 'Grade 5',
@@ -384,15 +385,15 @@ describe('public parent admission portal', () => {
     const user = userEvent.setup()
     const listAdmissionClasses = vi.spyOn(admissionsApi.public, 'listAdmissionClasses').mockResolvedValue([
       { id: 7, name: 'Grade 5', section: 'A', academic_year: '2026-2027' },
-      { id: 8, name: 'Grade 6', section: null, academic_year: '2026-2027' },
-      { id: 9, name: 'Grade 4', section: 'A', academic_year: '2025-26' },
+      { id: 8, name: '6th Grade', section: 'B', academic_year: '2026-2027' },
+      { id: 9, name: 'Grade 4', section: 'A', academic_year: '2025-2026' },
     ])
     const getInquiryStatus = vi.spyOn(admissionsApi.public, 'getInquiryStatus').mockResolvedValue(publicStatus)
     const submitAdmission = vi.spyOn(admissionsApi.public, 'submitAdmission').mockResolvedValue({
       admission_code: 'ADM202600010',
       status: 'submitted',
     })
-    vi.spyOn(admissionsApi.public, 'uploadAdmissionDocument').mockResolvedValue({
+    const uploadDocument = vi.spyOn(admissionsApi.public, 'uploadAdmissionDocument').mockResolvedValue({
       document_type: 'progress_report',
       verification_status: 'PENDING',
       rejection_reason: null,
@@ -408,24 +409,24 @@ describe('public parent admission portal', () => {
 
     expect(await screen.findByText(/Current status: INTERVIEW_PASS/)).toBeInTheDocument()
     expect(listAdmissionClasses).toHaveBeenCalled()
-    const classSelect = await screen.findByLabelText(/Class and academic year/)
-    expect(classSelect).toHaveValue('7')
-    expect(within(classSelect).getByRole('option', {
-      name: 'Grade 6 · 2026-2027',
-    })).toBeInTheDocument()
-    expect(within(classSelect).getByRole('option', {
-      name: 'Grade 4 — Section A · 2025-26',
-    })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Admission class assignment' })).toHaveTextContent(/Student name\s*Taylor Example/)
+    expect(screen.getByRole('region', { name: 'Admission class assignment' })).toHaveTextContent(/Class\s*Grade 5/)
+    expect(screen.getByRole('region', { name: 'Admission class assignment' })).toHaveTextContent(/Academic year\s*Assigned by administration during enrollment/)
+    expect(screen.queryByLabelText(/Grade \/ class/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Academic year/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Section/)).not.toBeInTheDocument()
     await user.type(screen.getByLabelText(/Student Aadhaar number/), '123456789012')
     await user.type(screen.getByLabelText(/Parent \/ guardian Aadhaar number/), '987654321098')
     await user.type(screen.getByLabelText(/Marks obtained at last school/), '450')
     await user.type(screen.getByLabelText(/Last-school percentage/), '90')
     await user.type(screen.getByLabelText(/Last-school student ID \/ roll number/), 'ROLL-12')
-    for (const index of [0, 1, 2, 3, 4, 5]) {
+    for (const index of [0, 1, 2, 3]) {
       const file = new File([`file-${index}`], `${index}.pdf`, { type: 'application/pdf' })
       const fileInput = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[index]
       fireEvent.change(fileInput, { target: { files: [file] } })
     }
+    expect(screen.getByLabelText(/Migration certificate/)).not.toBeRequired()
+    expect(screen.getByLabelText(/Character certificate/)).not.toBeRequired()
     await user.click(screen.getByRole('button', { name: 'Submit admission application' }))
 
     expect(await screen.findByText('Admission application submitted')).toBeInTheDocument()
@@ -436,8 +437,44 @@ describe('public parent admission portal', () => {
       class_id: 7,
       academic_year: '2026-2027',
     }))
+    expect(submitAdmission.mock.calls[0][0]).not.toHaveProperty('section')
     expect(getInquiryStatus).toHaveBeenCalledWith('INQ202600010', 'parent@example.com', '+15555550112')
+    expect(uploadDocument).toHaveBeenCalledTimes(4)
+    expect(uploadDocument.mock.calls.map((call) => call[1]))
+      .not.toContain('migration_certificate')
+    expect(uploadDocument.mock.calls.map((call) => call[1]))
+      .not.toContain('character_certificate')
     expect(listAdmissionClasses).toHaveBeenCalled()
+  })
+
+  it('prevents a second application and shows the review message with administration contacts', async () => {
+    const user = userEvent.setup()
+    const getInquiryStatus = vi.spyOn(admissionsApi.public, 'getInquiryStatus').mockResolvedValue({
+      ...publicStatus,
+      status: 'DOCUMENT_PENDING',
+      admission: {
+        admission_code: 'ADM202600010',
+        status: 'submitted',
+        documents_uploaded: 4,
+        documents_required: 4,
+        documents: [],
+      },
+    })
+    const submitAdmission = vi.spyOn(admissionsApi.public, 'submitAdmission')
+    renderPortal('/application/submit')
+
+    await user.type(await screen.findByLabelText(/Inquiry code/), 'INQ202600010')
+    await user.type(screen.getByLabelText(/Parent email/), 'parent@example.com')
+    await user.type(screen.getByLabelText(/Parent mobile/), '+15555550112')
+    await user.click(screen.getByRole('button', { name: 'Verify inquiry' }))
+
+    expect(await screen.findByText('Your admission application is under review')).toBeInTheDocument()
+    expect(screen.getByText(/already been submitted/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '+91 8967558216' })).toHaveAttribute('href', 'tel:+918967558216')
+    expect(screen.getByRole('link', { name: 'rpsschoolroh@gmail.com' })).toHaveAttribute('href', 'mailto:rpsschoolroh@gmail.com')
+    expect(screen.queryByRole('button', { name: 'Submit admission application' })).not.toBeInTheDocument()
+    expect(submitAdmission).not.toHaveBeenCalled()
+    expect(getInquiryStatus).toHaveBeenCalled()
   })
 
   it('does not show class selection until the school records an interview pass', async () => {

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { PermissionGate } from '@/components/auth/permission-gate'
+import { ClassRecordSelector } from '@/components/school/class-record-selector'
 import { RecordList } from '@/components/school/record-list'
 import { FormDialog } from '@/components/school/form-dialog'
 import { StatusBadge } from '@/components/school/status-badge'
@@ -301,17 +302,13 @@ function TeacherAssignmentsDialog({
         {classesQuery.error ? (
           <ErrorState description={toApiError(classesQuery.error).message} onRetry={() => void classesQuery.refetch()} />
         ) : (
-          <SearchableSelect
-            label="Active class"
-            onChange={(value) => {
-              setClassId(value)
+          <ClassRecordSelector
+            classes={classesQuery.data?.items ?? []}
+            labelPrefix="Active class"
+            onChange={(_, schoolClass) => {
+              setClassId(schoolClass ? String(schoolClass.id) : '')
               setSubjectId('')
             }}
-            options={(classesQuery.data?.items ?? []).map((item) => ({
-              value: String(item.id),
-              label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-            }))}
-            value={classId}
           />
         )}
         {offeringsQuery.error ? (

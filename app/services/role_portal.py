@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -29,7 +28,7 @@ from app.models.role_portal import (
 from app.models.student import Student
 from app.models.student_inquiry import StudentInquiry
 from app.models.subject import ClassSubject, Subject, TeacherClassSubject
-from app.models.teacher import Teacher
+from app.models.teacher import Teacher, TeacherClass
 from app.models.user import User
 from app.repositories.subjects import active_teacher_exists
 from app.schemas.role_portal import (
@@ -47,7 +46,6 @@ from app.schemas.role_portal import (
 from app.services.audit import AuditService
 from app.services.auth import _collect_roles_and_permissions
 from app.utils.file_storage import save_upload_file
-
 
 ADMIN_ROLES = {"ADMIN", "SUPER_ADMIN"}
 
@@ -139,6 +137,7 @@ class RolePortalService:
             .where(
                 ClassSubject.class_id == class_id,
                 ClassSubject.subject_id == subject_id,
+                ClassSubject.is_active.is_(True),
                 Class.status == "active",
                 Class.deleted_at.is_(None),
                 Subject.is_active.is_(True),
@@ -150,7 +149,8 @@ class RolePortalService:
     def _require_teacher_mapping(self, teacher_id: int, class_id: int, subject_id: int) -> None:
         if not active_teacher_exists(self.session, teacher_id):
             raise NotFoundException("Active teacher not found")
-        if self.session.get(TeacherClassSubject, (teacher_id, class_id, subject_id)) is None:
+        assignment = self.session.get(TeacherClassSubject, (teacher_id, class_id, subject_id))
+        if assignment is None or not assignment.is_active:
             raise BusinessRuleException(
                 "The teacher must be mapped to the selected class and subject"
             )
@@ -169,6 +169,7 @@ class RolePortalService:
                 .join(Subject, Subject.id == TeacherClassSubject.subject_id)
                 .where(
                     TeacherClassSubject.teacher_id == teacher.id,
+                    TeacherClassSubject.is_active.is_(True),
                     Class.status == "active",
                     Class.deleted_at.is_(None),
                     Subject.is_active.is_(True),
@@ -187,17 +188,21 @@ class RolePortalService:
         teacher = self._teacher(user)
         self._require_class_subject(class_id, subject_id)
         key = (teacher.id, class_id, subject_id)
-        if self.session.get(TeacherClassSubject, key) is not None:
+        existing_assignment = self.session.get(TeacherClassSubject, key)
+        if existing_assignment is not None and existing_assignment.is_active:
             raise ConflictException("Teacher is already assigned to this class subject")
         try:
             with transaction(self.session):
-                self.session.add(
-                    TeacherClassSubject(
-                        teacher_id=teacher.id,
-                        class_id=class_id,
-                        subject_id=subject_id,
+                if existing_assignment is not None:
+                    existing_assignment.is_active = True
+                else:
+                    self.session.add(
+                        TeacherClassSubject(
+                            teacher_id=teacher.id,
+                            class_id=class_id,
+                            subject_id=subject_id,
+                        )
                     )
-                )
                 if self.session.get(TeacherClass, (teacher.id, class_id)) is None:
                     self.session.add(TeacherClass(teacher_id=teacher.id, class_id=class_id))
                 self.audit.log(
@@ -223,7 +228,7 @@ class RolePortalService:
             TeacherClassSubject,
             (teacher.id, class_id, subject_id),
         )
-        if assignment is None:
+        if assignment is None or not assignment.is_active:
             raise NotFoundException("Teacher is not assigned to this class subject")
         referenced = any(
             self.session.scalar(
@@ -242,7 +247,7 @@ class RolePortalService:
             )
         try:
             with transaction(self.session):
-                self.session.delete(assignment)
+                assignment.is_active = False
                 self.audit.log(
                     action="teacher.self_class_subject.remove",
                     entity_type="teacher",
@@ -336,7 +341,11 @@ class RolePortalService:
             raise BusinessRuleException("At least one assignment field must be provided")
         if values.get("due_date") and values["due_date"] < assignment.assigned_date:
             raise BusinessRuleException("Due date cannot be before the assigned date")
-        before = {"title": assignment.title, "details": assignment.details, "due_date": assignment.due_date}
+        before = {
+            "title": assignment.title,
+            "details": assignment.details,
+            "due_date": assignment.due_date,
+        }
         with transaction(self.session):
             for key, value in values.items():
                 if value is not None:
@@ -350,7 +359,11 @@ class RolePortalService:
                 actor_user_id=user.id,
                 old_values=jsonable_encoder(before),
                 new_values=jsonable_encoder(
-                    {"title": assignment.title, "details": assignment.details, "due_date": assignment.due_date}
+                    {
+                        "title": assignment.title,
+                        "details": assignment.details,
+                        "due_date": assignment.due_date,
+                    }
                 ),
                 request=request,
             )
@@ -457,9 +470,13 @@ class RolePortalService:
             teacher = self._teacher(user)
             return stmt.where(TimetableEntry.teacher_id == teacher.id)
         class_ids = self._student_classes(user)
-        return stmt.where(TimetableEntry.class_id.in_(class_ids)) if class_ids else stmt.where(False)
+        return (
+            stmt.where(TimetableEntry.class_id.in_(class_ids)) if class_ids else stmt.where(False)
+        )
 
-    def list_timetable(self, user: User, class_id: int | None = None, academic_year: str | None = None):
+    def list_timetable(
+        self, user: User, class_id: int | None = None, academic_year: str | None = None
+    ):
         stmt = self._timetable_query(user)
         if class_id is not None:
             stmt = stmt.where(TimetableEntry.class_id == class_id)
@@ -504,9 +521,7 @@ class RolePortalService:
 
     def _lock_timetable_scope(self, class_ids: set[int], teacher_ids: set[int]) -> None:
         for class_id in sorted(class_ids):
-            self.session.scalar(
-                select(Class.id).where(Class.id == class_id).with_for_update()
-            )
+            self.session.scalar(select(Class.id).where(Class.id == class_id).with_for_update())
         for teacher_id in sorted(teacher_ids):
             self.session.scalar(
                 select(Teacher.id).where(Teacher.id == teacher_id).with_for_update()
@@ -576,9 +591,7 @@ class RolePortalService:
             raise BusinessRuleException("At least one timetable field must be provided")
         with transaction(self.session):
             entry = self.session.scalar(
-                select(TimetableEntry)
-                .where(TimetableEntry.id == entry_id)
-                .with_for_update()
+                select(TimetableEntry).where(TimetableEntry.id == entry_id).with_for_update()
             )
             if not entry:
                 raise NotFoundException("Timetable entry not found")
@@ -719,9 +732,7 @@ class RolePortalService:
             raise BusinessRuleException("At least one assessment field must be provided")
         with transaction(self.session):
             assessment = self.session.scalar(
-                select(Assessment)
-                .where(Assessment.id == assessment_id)
-                .with_for_update()
+                select(Assessment).where(Assessment.id == assessment_id).with_for_update()
             )
             if not assessment:
                 raise NotFoundException("Assessment not found")
@@ -737,9 +748,7 @@ class RolePortalService:
                     .limit(1)
                 )
                 if highest_score is not None:
-                    raise BusinessRuleException(
-                        "Maximum score cannot be below an entered result"
-                    )
+                    raise BusinessRuleException("Maximum score cannot be below an entered result")
             before = {key: getattr(assessment, key) for key in values}
             for key, value in values.items():
                 if value is not None:
@@ -769,9 +778,7 @@ class RolePortalService:
         self.get_assessment(assessment_id, user)
         with transaction(self.session):
             assessment = self.session.scalar(
-                select(Assessment)
-                .where(Assessment.id == assessment_id)
-                .with_for_update()
+                select(Assessment).where(Assessment.id == assessment_id).with_for_update()
             )
             if not assessment:
                 raise NotFoundException("Assessment not found")
@@ -846,9 +853,7 @@ class RolePortalService:
         self.get_assessment(assessment_id, user)
         with transaction(self.session):
             assessment = self.session.scalar(
-                select(Assessment)
-                .where(Assessment.id == assessment_id)
-                .with_for_update()
+                select(Assessment).where(Assessment.id == assessment_id).with_for_update()
             )
             if not assessment:
                 raise NotFoundException("Assessment not found")
@@ -998,10 +1003,7 @@ class RolePortalService:
                 event.reviewed_by = None
                 event.reviewed_at = None
             self.session.flush()
-            new_values = {
-                key: updated.get(key, getattr(event, key))
-                for key in updated
-            }
+            new_values = {key: updated.get(key, getattr(event, key)) for key in updated}
             new_values["status"] = event.status
             self.audit.log(
                 action="event.update",

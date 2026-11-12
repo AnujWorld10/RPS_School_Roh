@@ -119,7 +119,7 @@ def test_subject_management_requires_authentication(client):
     assert response.status_code == 401
 
 
-def test_teacher_can_manage_subject_catalog(client, db_session):
+def test_subject_catalog_changes_are_restricted_to_administrators(client, db_session):
     role = db_session.query(Role).filter(Role.code == "TEACHER").one()
     user = User(
         first_name="Subject",
@@ -143,7 +143,7 @@ def test_teacher_can_manage_subject_catalog(client, db_session):
         json={"code": "SCI", "name": "Science"},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 201
+    assert response.status_code == 403
 
 
 def test_class_readiness_requires_class_teacher_and_active_subjects(db_session):

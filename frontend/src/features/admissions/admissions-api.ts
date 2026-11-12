@@ -93,6 +93,7 @@ export type InquiryCreated = {
 
 export type PublicInquiryStatus = {
   inquiry_code: string
+  student_name: string
   status: string
   rejection_reason: string | null
   admission_for_class: string
@@ -138,6 +139,18 @@ export type DocumentType =
   | 'character_certificate'
   | 'student_aadhar'
   | 'parent_aadhar'
+
+export const REQUIRED_ADMISSION_DOCUMENT_TYPES: DocumentType[] = [
+  'progress_report',
+  'transfer_certificate',
+  'student_aadhar',
+  'parent_aadhar',
+]
+
+export const OPTIONAL_ADMISSION_DOCUMENT_TYPES: DocumentType[] = [
+  'migration_certificate',
+  'character_certificate',
+]
 
 export type PublicAdmissionClass = {
   id: number
@@ -455,10 +468,11 @@ export const admissionsApi = {
         data: { rejection_reason },
       })
     },
-    enroll(id: number) {
+    enroll(id: number, classId: number) {
       return requestData<EnrollmentResult>({
         method: 'POST',
         url: `/inquiry-admissions/${id}/enroll`,
+        data: { class_id: classId },
       })
     },
     requiredDocuments() {

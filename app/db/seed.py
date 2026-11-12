@@ -7,6 +7,7 @@ from app.core.config import get_settings
 from app.core.permissions import DEFAULT_PERMISSIONS, DEFAULT_ROLES, ROLE_PERMISSION_MAP
 from app.core.security import hash_password, validate_password_strength
 from app.db.session import SessionLocal
+from app.models.academics import GradingRule
 from app.models.business_id_sequence import BusinessIDSequence
 from app.models.class_model import Class
 from app.models.enums import ClassStatus, UserStatus
@@ -47,6 +48,7 @@ def seed_database(session: Session | None = None) -> None:
         _seed_super_admin(session)
         _seed_business_id_sequences(session)
         _seed_classes(session)
+        _seed_grading_rules(session)
         session.commit()
     except Exception:
         session.rollback()
@@ -169,3 +171,26 @@ def _seed_classes(session: Session) -> None:
             )
         )
     logger.info("seeded default school classes (grades 1–10)")
+
+
+def _seed_grading_rules(session: Session) -> None:
+    if session.scalar(select(GradingRule.id).where(GradingRule.scale_code == "DEFAULT")):
+        return
+    for grade, minimum, maximum, description in (
+        ("F", 0, 32.99, "Needs improvement"),
+        ("D", 33, 39.99, "Basic"),
+        ("C", 40, 49.99, "Satisfactory"),
+        ("B", 50, 59.99, "Good"),
+        ("A", 60, 74.99, "Very good"),
+        ("A+", 75, 89.99, "Excellent"),
+        ("O", 90, 100, "Outstanding"),
+    ):
+        session.add(
+            GradingRule(
+                scale_code="DEFAULT",
+                grade=grade,
+                minimum_percentage=minimum,
+                maximum_percentage=maximum,
+                description=description,
+            )
+        )

@@ -4,7 +4,7 @@
 
 The OpenAPI schema at `/openapi.json` and interactive `/docs` are the runtime contract. This file provides a browsable snapshot of every operation, its parameters, request and response schemas, and the field constraints exposed by OpenAPI. The shared response envelopes and route permissions are documented in [the technical guide](technical-documentation.md#8-authentication--authorization).
 
-**Operations:** 122
+**Operations:** 141
 
 ## Operations
 
@@ -152,6 +152,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Inquiry status fetched successfully",
   "data": {
     "inquiry_code": "INQ202600007",
+    "student_name": "Example student name",
     "status": "PENDING",
     "rejection_reason": "Required admission document is missing.",
     "admission_for_class": "Grade 5",
@@ -177,7 +178,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
       "admission_code": "ADM202600055",
       "status": "submitted",
       "documents_uploaded": 0,
-      "documents_required": 6,
+      "documents_required": 4,
       "documents": [
         {
           "document_type": "Example document type",
@@ -260,6 +261,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Inquiry updated successfully",
   "data": {
     "inquiry_code": "INQ202600007",
+    "student_name": "Example student name",
     "status": "PENDING",
     "rejection_reason": "Required admission document is missing.",
     "admission_for_class": "Grade 5",
@@ -285,7 +287,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
       "admission_code": "ADM202600055",
       "status": "submitted",
       "documents_uploaded": 0,
-      "documents_required": 6,
+      "documents_required": 4,
       "documents": [
         {
           "document_type": "Example document type",
@@ -471,6 +473,731 @@ The handler does not have a declared response model in OpenAPI; its exact data s
 | HTTP status | Description | Response schema |
 |---:|---|---|
 | `200` | Successful Response | `application/json`: object |
+
+### `GET /api/v1/academics/classes/{class_id}/subjects`
+
+List Class Subjects
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.subjects.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Class subject offerings fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "code": "MATH",
+      "name": "Mathematics",
+      "is_active": true
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/academics/classes/{class_id}/subjects/{subject_id}`
+
+Configure Class Subject
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.subjects.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`SubjectOfferingRequest`](#subjectofferingrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "subject_type": "mandatory",
+  "stream": "Example stream",
+  "is_active": true
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/academics/classes/{class_id}/subjects/{subject_id}/teacher`
+
+Assign Class Subject Teacher
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.subjects.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | path | Yes | integer | Numeric database ID of the class. |
+| `subject_id` | path | Yes | integer | Numeric database ID of the subject. |
+| `teacher_id` | query | Yes | integer | Numeric database ID of the teacher. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/academics/students/me/subjects`
+
+List My Subjects
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.results.read`.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+
+### `GET /api/v1/academics/students/me/results`
+
+List My Results
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.results.read`.
+
+**Parameters:** None.
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+
+### `GET /api/v1/academics/students/{student_id}/subjects`
+
+List Student Subjects
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.electives.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the token strings are not valid credentials.
+
+```json
+{
+  "success": true,
+  "message": "Student subjects fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "code": "MATH",
+      "name": "Mathematics",
+      "is_active": true
+    }
+  ],
+  "meta": {
+    "request_id": "example-request-id",
+    "timestamp": "2026-10-20T10:00:00Z"
+  }
+}
+```
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/academics/students/{student_id}/electives`
+
+Update Student Electives
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.electives.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `student_id` | path | Yes | integer | Numeric database ID of the student. |
+
+**Request body**
+
+Required: Yes
+- `application/json`: array of integer
+
+**Illustrative JSON request**
+
+```json
+[
+  1
+]
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/academics/examinations`
+
+Create Examination
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters:** None.
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`ExaminationCreateRequest`](#examinationcreaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "name": "Grade 5",
+  "class_id": 1,
+  "examination_type": "unit_test",
+  "start_date": "2026-10-20",
+  "end_date": "2026-10-20",
+  "description": "Example description",
+  "subjects": [
+    {
+      "subject_id": 1,
+      "teacher_id": 1,
+      "max_marks": 1.0,
+      "passing_marks": 1.0,
+      "components": [
+        {
+          "name": "Grade 5",
+          "component_type": "theory",
+          "max_marks": 1.0,
+          "passing_marks": 1.0
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `201` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/academics/examinations`
+
+List Examinations
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | query | No | anyOf: integer, null | Numeric database ID of the class. |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/academics/examinations/{examination_id}`
+
+Get Examination
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/academics/examinations/{examination_id}/schedule`
+
+Schedule Examination
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/academics/examinations/{examination_id}/marks`
+
+Enter Marks
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.marks.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`MarksBatchRequest`](#marksbatchrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "marks": [
+    {
+      "student_id": 1,
+      "component_id": 1,
+      "status": "PRESENT",
+      "obtained_marks": 1.0,
+      "remarks": "Please bring the previous report card."
+    }
+  ]
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/academics/examinations/{examination_id}/roster`
+
+Get Examination Roster
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.marks.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/academics/examinations/{examination_id}/publish`
+
+Publish Examination
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/academics/examinations/{examination_id}/lock`
+
+Lock Examination
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `POST /api/v1/academics/examinations/{examination_id}/corrections`
+
+Correct Marks
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.marks.correct`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`MarksCorrectionRequest`](#markscorrectionrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "marks": [
+    {
+      "student_id": 1,
+      "component_id": 1,
+      "status": "PRESENT",
+      "obtained_marks": 1.0,
+      "remarks": "Please bring the previous report card."
+    }
+  ],
+  "reason": "Updated student enrollment status."
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/academics/examinations/{examination_id}/results`
+
+List Examination Results
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `examination_id` | path | Yes | integer | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `GET /api/v1/academics/grading-scales/{scale_code}`
+
+List Grading Rules
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.examinations.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `scale_code` | path | Yes | string | — |
+
+**Request body:** Not used by this endpoint.
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
+
+### `PUT /api/v1/academics/grading-scales/{scale_code}`
+
+Update Grading Rules
+
+**Group:** `academics`
+
+**OpenAPI authentication:** `HTTPBearer`
+
+**Authorization requirement:** Requires permission `academics.grading.manage`.
+
+**Parameters**
+
+| Name | Location | Required | Type and constraints | Description |
+|---|---|---:|---|---|
+| `scale_code` | path | Yes | string | — |
+
+**Request body**
+
+Required: Yes
+- `application/json`: [`GradingScaleUpdateRequest`](#gradingscaleupdaterequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "rules": [
+    {
+      "grade": "Example grade",
+      "minimum_percentage": 1.0,
+      "maximum_percentage": 1.0,
+      "description": "Example description"
+    }
+  ]
+}
+```
+
+**Illustrative success response**
+
+The handler does not have a declared response model in OpenAPI; its exact data structure must be checked in the route implementation.
+
+**Responses**
+
+| HTTP status | Description | Response schema |
+|---:|---|---|
+| `200` | Successful Response | `application/json`: object |
+| `422` | Validation Error | Standard API error envelope; see [HTTP 422 example](#http-422-validation-error). The runtime handler replaces FastAPI's default validation-error body. |
+
+**Validation failure example:** See [HTTP 422 error example](#http-422-validation-error). The exact error field/message depends on which path, query, header, form, or body rule failed.
 
 ### `GET /api/v1/teachers/me/class-subjects`
 
@@ -1901,6 +2628,9 @@ List Classes
 
 | Name | Location | Required | Type and constraints | Description |
 |---|---|---:|---|---|
+| `name` | query | No | anyOf: string, null | Filter by grade or class name. |
+| `section` | query | No | anyOf: string, null | Filter by section. |
+| `section_is_null` | query | No | boolean | Filter for classes without a section. |
 | `academic_year` | query | No | anyOf: string, null; Example: `2026-2027` | Filter by academic year. |
 | `status` | query | No | anyOf: [`ClassStatus`](#classstatus), null | Filter by class state: active or inactive. |
 | `page` | query | No | integer | 1-based page number to return. |
@@ -2170,7 +2900,7 @@ List Class Subjects
 
 **OpenAPI authentication:** `HTTPBearer`
 
-**Authorization requirement:** Requires permission `classes.read`.
+**Authorization requirement:** Requires permission `academics.subjects.manage`.
 
 **Parameters**
 
@@ -2187,7 +2917,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 ```json
 {
   "success": true,
-  "message": "Class subjects fetched successfully",
+  "message": "Class subject offerings fetched successfully",
   "data": [
     {
       "id": 1,
@@ -4522,7 +5252,7 @@ List Student Subjects
 
 **OpenAPI authentication:** `HTTPBearer`
 
-**Authorization requirement:** Requires permission `students.read`.
+**Authorization requirement:** Requires permission `academics.electives.manage`.
 
 **Parameters**
 
@@ -4539,7 +5269,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
 ```json
 {
   "success": true,
-  "message": "Student class subjects fetched successfully",
+  "message": "Student subjects fetched successfully",
   "data": [
     {
       "id": 1,
@@ -4606,6 +5336,7 @@ HTTP `201`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Student created successfully",
   "data": {
     "id": 1,
+    "student_code": "STU202600001",
     "admission_no": "ADM2026001",
     "first_name": "Aarav",
     "last_name": "Sharma",
@@ -4667,6 +5398,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "data": [
     {
       "id": 1,
+      "student_code": "STU202600001",
       "admission_no": "ADM2026001",
       "first_name": "Aarav",
       "last_name": "Sharma",
@@ -4728,6 +5460,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Student fetched successfully",
   "data": {
     "id": 1,
+    "student_code": "STU202600001",
     "admission_no": "ADM2026001",
     "first_name": "Aarav",
     "last_name": "Sharma",
@@ -4799,6 +5532,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Student updated successfully",
   "data": {
     "id": 1,
+    "student_code": "STU202600001",
     "admission_no": "ADM2026001",
     "first_name": "Aarav",
     "last_name": "Sharma",
@@ -4908,6 +5642,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Student status updated successfully",
   "data": {
     "id": 1,
+    "student_code": "STU202600001",
     "admission_no": "ADM2026001",
     "first_name": "Aarav",
     "last_name": "Sharma",
@@ -4974,6 +5709,7 @@ HTTP `200`. IDs, dates, request IDs, and tokens below are illustrative; the toke
   "message": "Student class assigned successfully",
   "data": {
     "id": 1,
+    "student_code": "STU202600001",
     "admission_no": "ADM2026001",
     "first_name": "Aarav",
     "last_name": "Sharma",
@@ -5022,7 +5758,12 @@ Required: Yes
 ```json
 {
   "code": "MATH",
-  "name": "Mathematics"
+  "name": "Mathematics",
+  "category": "Example category",
+  "description": "Example description",
+  "subject_type": "mandatory",
+  "max_marks": 1.0,
+  "passing_marks": 1.0
 }
 ```
 
@@ -5191,7 +5932,12 @@ Required: Yes
 ```json
 {
   "code": "MATH",
-  "name": "Mathematics"
+  "name": "Mathematics",
+  "category": "Example category",
+  "description": "Example description",
+  "subject_type": "mandatory",
+  "max_marks": 1.0,
+  "passing_marks": 1.0
 }
 ```
 
@@ -5947,7 +6693,18 @@ Enroll student — assigns STU code and roll number
 |---|---|---:|---|---|
 | `admission_id` | path | Yes | integer | — |
 
-**Request body:** Not used by this endpoint.
+**Request body**
+
+Required: Yes
+- `application/json`: [`EnrollmentRequest`](#enrollmentrequest)
+
+**Illustrative JSON request**
+
+```json
+{
+  "class_id": 1
+}
+```
 
 **Illustrative success response**
 
@@ -7406,6 +8163,14 @@ Staff verification of a single document.
 |---|---|---:|---|---|
 | `rejection_reason` | anyOf: string, null | No | — | Reason for rejecting the document; required when verification status is set to REJECTED. |
 
+### `EnrollmentRequest`
+
+Staff-selected class section for an approved admission.
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `class_id` | integer | Yes | — | Active class/section selected for enrollment. |
+
 ### `EventCreateRequest`
 
 | Property | Type | Required | Constraints | Description |
@@ -7435,6 +8200,37 @@ Staff verification of a single document.
 | `venue` | anyOf: string, null | No | — | — |
 | `audience` | anyOf: string, null | No | — | — |
 
+### `ExaminationComponentInput`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `name` | string | Yes | Min length: `1`; Max length: `100` | — |
+| `component_type` | string | Yes | Allowed values: `theory, practical, internal, combined` | — |
+| `max_marks` | anyOf: number, string | Yes | — | — |
+| `passing_marks` | anyOf: number, string | Yes | — | — |
+
+### `ExaminationCreateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `name` | string | Yes | Min length: `1`; Max length: `200` | — |
+| `class_id` | integer | Yes | — | — |
+| `examination_type` | string | Yes | Allowed values: `unit_test, periodic_test, term, mid_term, final_exam, practical, oral` | — |
+| `start_date` | string (date) | Yes | — | — |
+| `end_date` | string (date) | Yes | — | — |
+| `description` | anyOf: string, null | No | — | — |
+| `subjects` | array of [`ExaminationSubjectInput`](#examinationsubjectinput) | Yes | Min items: `1` | — |
+
+### `ExaminationSubjectInput`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `subject_id` | integer | Yes | — | — |
+| `teacher_id` | anyOf: integer, null | No | — | — |
+| `max_marks` | anyOf: number, string | Yes | — | — |
+| `passing_marks` | anyOf: number, string | Yes | — | — |
+| `components` | array of [`ExaminationComponentInput`](#examinationcomponentinput) | Yes | Min items: `1` | — |
+
 ### `FeeStructureStatusUpdate`
 
 | Property | Type | Required | Constraints | Description |
@@ -7446,6 +8242,21 @@ Staff verification of a single document.
 Student gender values accepted on public inquiry forms.
 
 **Allowed values:** `male`, `female`, `other`
+
+### `GradingRuleInput`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `grade` | string | Yes | Min length: `1`; Max length: `10` | — |
+| `minimum_percentage` | anyOf: number, string | Yes | — | — |
+| `maximum_percentage` | anyOf: number, string | Yes | — | — |
+| `description` | anyOf: string, null | No | — | — |
+
+### `GradingScaleUpdateRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `rules` | array of [`GradingRuleInput`](#gradingruleinput) | Yes | Min items: `1`; Max items: `20` | — |
 
 ### `HTTPValidationError`
 
@@ -7460,7 +8271,7 @@ Submit admission application after interview pass (staff or verified parent).
 | Property | Type | Required | Constraints | Description |
 |---|---|---:|---|---|
 | `class_id` | integer | Yes | — | Target class catalog ID.; Example: `1` |
-| `section` | anyOf: string, null | No | — | Requested class section. |
+| `section` | anyOf: string, null | No | — | Class section assigned by staff during enrollment. |
 | `academic_year` | string | Yes | Min length: `4`; Max length: `20` | Academic year for admission.; Example: `2026-2027` |
 | `permanent_address` | anyOf: string, null | No | — | Applicant's permanent residential address. |
 | `student_aadhaar` | anyOf: string, null | No | — | Student Aadhaar number; encrypted at rest and never returned by the API. |
@@ -7555,6 +8366,19 @@ Record pass, fail, or absent for a scheduled interview.
 | Property | Type | Required | Constraints | Description |
 |---|---|---:|---|---|
 | `refresh_token` | string | Yes | — | Refresh token to revoke. |
+
+### `MarksBatchRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `marks` | array of [`StudentMarkInput`](#studentmarkinput) | Yes | Min items: `1`; Max items: `2000` | — |
+
+### `MarksCorrectionRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `marks` | array of [`StudentMarkInput`](#studentmarkinput) | Yes | Min items: `1`; Max items: `2000` | — |
+| `reason` | string | Yes | Min length: `5`; Max length: `500` | — |
 
 ### `MonthlyFeeComponentCreate`
 
@@ -7706,6 +8530,16 @@ Parent must prove ownership via inquiry_code + email + parent_mobile.
 | `phone` | anyOf: string, null | No | — | Optional student or guardian phone number. |
 | `current_class_id` | anyOf: integer, null | No | — | Optional ID of the student's current class.; Example: `1` |
 
+### `StudentMarkInput`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `student_id` | integer | Yes | — | — |
+| `component_id` | integer | Yes | — | — |
+| `status` | string | Yes | Allowed values: `PRESENT, ABSENT, EXEMPTED` | — |
+| `obtained_marks` | anyOf: number, string, null | No | — | — |
+| `remarks` | anyOf: string, null | No | — | — |
+
 ### `StudentPortalLoginRequest`
 
 | Property | Type | Required | Constraints | Description |
@@ -7746,6 +8580,19 @@ Parent must prove ownership via inquiry_code + email + parent_mobile.
 |---|---|---:|---|---|
 | `code` | string | Yes | Min length: `1`; Max length: `50` | Unique subject code.; Example: `MATH` |
 | `name` | string | Yes | Min length: `1`; Max length: `100` | Subject display name.; Example: `Mathematics` |
+| `category` | anyOf: string, null | No | — | — |
+| `description` | anyOf: string, null | No | — | — |
+| `subject_type` | string | No | Allowed values: `mandatory, elective, optional`; Default: `mandatory` | — |
+| `max_marks` | anyOf: number, string, null | No | — | — |
+| `passing_marks` | anyOf: number, string, null | No | — | — |
+
+### `SubjectOfferingRequest`
+
+| Property | Type | Required | Constraints | Description |
+|---|---|---:|---|---|
+| `subject_type` | string | Yes | Allowed values: `mandatory, elective, optional` | — |
+| `stream` | anyOf: string, null | No | — | — |
+| `is_active` | boolean | No | Default: `True` | — |
 
 ### `SubjectUpdateRequest`
 
@@ -7753,6 +8600,11 @@ Parent must prove ownership via inquiry_code + email + parent_mobile.
 |---|---|---:|---|---|
 | `code` | anyOf: string, null | No | — | Updated unique subject code.; Example: `MATH` |
 | `name` | anyOf: string, null | No | — | Updated subject display name.; Example: `Mathematics` |
+| `category` | anyOf: string, null | No | — | — |
+| `description` | anyOf: string, null | No | — | — |
+| `subject_type` | anyOf: string, null | No | — | — |
+| `max_marks` | anyOf: number, string, null | No | — | — |
+| `passing_marks` | anyOf: number, string, null | No | — | — |
 
 ### `TeacherClassSubjectAssignRequest`
 

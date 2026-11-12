@@ -77,6 +77,7 @@ class StudentClassAssignRequest(BaseModel):
 
 class StudentResponse(ORMModel):
     id: int = Field(..., description="Internal student ID.")
+    student_code: str = Field(..., description="School-issued student identifier.")
     admission_no: str | None = Field(
         ..., description="School-issued admission number, if assigned.", examples=["ADM2026001"]
     )

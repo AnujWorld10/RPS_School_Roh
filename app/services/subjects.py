@@ -27,13 +27,28 @@ class SubjectService:
             raise ConflictException("Subject code already exists", field="code")
         try:
             with transaction(self.session):
-                subject = self.repo.create(Subject(code=payload.code, name=payload.name))
+                subject = self.repo.create(
+                    Subject(
+                        code=payload.code,
+                        name=payload.name,
+                        category=payload.category,
+                        description=payload.description,
+                        subject_type=payload.subject_type,
+                        max_marks=payload.max_marks,
+                        passing_marks=payload.passing_marks,
+                    )
+                )
                 self.audit.log(
                     action="subject.create",
                     entity_type="subject",
                     entity_id=subject.id,
                     actor_user_id=actor_id,
-                    new_values={"code": subject.code, "name": subject.name},
+                    new_values={
+                        "code": subject.code,
+                        "name": subject.name,
+                        "category": subject.category,
+                        "subject_type": subject.subject_type,
+                    },
                     request=request,
                 )
                 return subject
@@ -67,14 +82,30 @@ class SubjectService:
             exclude_id=subject_id,
         ):
             raise ConflictException("Subject code already exists", field="code")
-        old_values = {"code": subject.code, "name": subject.name}
+        old_values = {
+            "code": subject.code,
+            "name": subject.name,
+            "category": subject.category,
+            "description": subject.description,
+            "subject_type": subject.subject_type,
+            "max_marks": subject.max_marks,
+            "passing_marks": subject.passing_marks,
+        }
         with transaction(self.session):
             subject = self.repo.get_for_update(subject_id)
             if subject is None:
                 raise NotFoundException("Subject not found")
-            for field in ("code", "name"):
+            for field in (
+                "code",
+                "name",
+                "category",
+                "description",
+                "subject_type",
+                "max_marks",
+                "passing_marks",
+            ):
                 value = getattr(payload, field)
-                if value is not None:
+                if field in payload.model_fields_set:
                     setattr(subject, field, value)
             try:
                 self.repo.update(subject)
@@ -89,6 +120,11 @@ class SubjectService:
                 new_values={
                     "code": subject.code,
                     "name": subject.name,
+                    "category": subject.category,
+                    "description": subject.description,
+                    "subject_type": subject.subject_type,
+                    "max_marks": subject.max_marks,
+                    "passing_marks": subject.passing_marks,
                     "is_active": subject.is_active,
                 },
                 request=request,

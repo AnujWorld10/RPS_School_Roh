@@ -25,6 +25,7 @@ from app.schemas.admissions import (
     RequiredDocumentsResponse,
 )
 from app.schemas.common import RejectionRequest
+from app.schemas.enrollment import EnrollmentRequest
 from app.services.admissions import AdmissionService
 from app.services.enrollment import EnrollmentService
 from app.services.inquiry_admissions import InquiryAdmissionService
@@ -245,11 +246,14 @@ def reject_inquiry_admission(
 )
 def enroll_student(
     admission_id: int,
+    payload: EnrollmentRequest,
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_permissions("enrollment.create"))],
 ):
-    result = EnrollmentService(db).enroll_student(admission_id, current_user.id, request)
+    result = EnrollmentService(db).enroll_student(
+        admission_id, current_user.id, request, class_id=payload.class_id
+    )
     return success_response(
         "Student enrolled successfully",
         result.model_dump(),

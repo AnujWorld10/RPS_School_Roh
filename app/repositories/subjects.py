@@ -45,6 +45,7 @@ class SubjectRepository(BaseRepository[Subject]):
             .join(Class, Class.id == ClassSubject.class_id)
             .where(
                 ClassSubject.subject_id == subject_id,
+                ClassSubject.is_active.is_(True),
                 Class.status == ClassStatus.ACTIVE.value,
                 Class.deleted_at.is_(None),
             )
@@ -60,17 +61,26 @@ class ClassSubjectRepository:
         return self.session.get(ClassSubject, (class_id, subject_id)) is not None
 
     def has_active_offering(self, class_id: int, subject_id: int) -> bool:
-        return self.session.scalar(
-            select(ClassSubject.class_id)
-            .join(Subject, Subject.id == ClassSubject.subject_id)
-            .where(
-                ClassSubject.class_id == class_id,
-                ClassSubject.subject_id == subject_id,
-                Subject.is_active.is_(True),
+        return (
+            self.session.scalar(
+                select(ClassSubject.class_id)
+                .join(Subject, Subject.id == ClassSubject.subject_id)
+                .where(
+                    ClassSubject.class_id == class_id,
+                    ClassSubject.subject_id == subject_id,
+                    ClassSubject.is_active.is_(True),
+                    Subject.is_active.is_(True),
+                )
             )
-        ) is not None
+            is not None
+        )
 
     def add(self, class_id: int, subject_id: int) -> ClassSubject:
+        offering = self.session.get(ClassSubject, (class_id, subject_id))
+        if offering is not None:
+            offering.is_active = True
+            self.session.flush()
+            return offering
         offering = ClassSubject(class_id=class_id, subject_id=subject_id)
         self.session.add(offering)
         self.session.flush()
@@ -78,9 +88,9 @@ class ClassSubjectRepository:
 
     def remove(self, class_id: int, subject_id: int) -> bool:
         offering = self.session.get(ClassSubject, (class_id, subject_id))
-        if offering is None:
+        if offering is None or not offering.is_active:
             return False
-        self.session.delete(offering)
+        offering.is_active = False
         self.session.flush()
         return True
 
@@ -92,22 +102,33 @@ class ClassSubjectRepository:
             .order_by(Subject.name, Subject.id)
         )
         if active_only:
-            stmt = stmt.where(Subject.is_active.is_(True))
+            stmt = stmt.where(
+                Subject.is_active.is_(True),
+                ClassSubject.is_active.is_(True),
+            )
         return list(self.session.scalars(stmt))
 
     def active_subject_ids(self, class_id: int) -> list[int]:
         stmt = (
             select(Subject.id)
             .join(ClassSubject, ClassSubject.subject_id == Subject.id)
-            .where(ClassSubject.class_id == class_id, Subject.is_active.is_(True))
+            .where(
+                ClassSubject.class_id == class_id,
+                ClassSubject.is_active.is_(True),
+                Subject.is_active.is_(True),
+            )
         )
         return list(self.session.scalars(stmt))
 
     def active_student_count(self, class_id: int) -> int:
-        stmt = select(func.count()).select_from(Student).where(
-            or_(Student.class_id == class_id, Student.current_class_id == class_id),
-            Student.deleted_at.is_(None),
-            Student.status == StudentStatus.ACTIVE.value,
+        stmt = (
+            select(func.count())
+            .select_from(Student)
+            .where(
+                or_(Student.class_id == class_id, Student.current_class_id == class_id),
+                Student.deleted_at.is_(None),
+                Student.status == StudentStatus.ACTIVE.value,
+            )
         )
         return self.session.scalar(stmt) or 0
 
@@ -117,12 +138,15 @@ class TeacherClassSubjectRepository:
         self.session = session
 
     def has_assignment(self, teacher_id: int, class_id: int, subject_id: int) -> bool:
-        return (
-            self.session.get(TeacherClassSubject, (teacher_id, class_id, subject_id))
-            is not None
-        )
+        assignment = self.session.get(TeacherClassSubject, (teacher_id, class_id, subject_id))
+        return assignment is not None and assignment.is_active
 
     def add(self, teacher_id: int, class_id: int, subject_id: int) -> TeacherClassSubject:
+        assignment = self.session.get(TeacherClassSubject, (teacher_id, class_id, subject_id))
+        if assignment is not None:
+            assignment.is_active = True
+            self.session.flush()
+            return assignment
         assignment = TeacherClassSubject(
             teacher_id=teacher_id,
             class_id=class_id,
@@ -134,9 +158,9 @@ class TeacherClassSubjectRepository:
 
     def remove(self, teacher_id: int, class_id: int, subject_id: int) -> bool:
         assignment = self.session.get(TeacherClassSubject, (teacher_id, class_id, subject_id))
-        if assignment is None:
+        if assignment is None or not assignment.is_active:
             return False
-        self.session.delete(assignment)
+        assignment.is_active = False
         self.session.flush()
         return True
 
@@ -150,8 +174,15 @@ class TeacherClassSubjectRepository:
             )
             .join(Class, Class.id == TeacherClassSubject.class_id)
             .join(Subject, Subject.id == TeacherClassSubject.subject_id)
+            .join(
+                ClassSubject,
+                (ClassSubject.class_id == TeacherClassSubject.class_id)
+                & (ClassSubject.subject_id == TeacherClassSubject.subject_id),
+            )
             .where(
                 TeacherClassSubject.teacher_id == teacher_id,
+                TeacherClassSubject.is_active.is_(True),
+                ClassSubject.is_active.is_(True),
                 Class.status == ClassStatus.ACTIVE.value,
                 Class.deleted_at.is_(None),
                 Subject.is_active.is_(True),
@@ -162,15 +193,19 @@ class TeacherClassSubjectRepository:
 
     def has_teacher_subject_assignment(self, teacher_id: int) -> bool:
         stmt = select(TeacherClassSubject.teacher_id).where(
-            TeacherClassSubject.teacher_id == teacher_id
+            TeacherClassSubject.teacher_id == teacher_id,
+            TeacherClassSubject.is_active.is_(True),
         )
         return self.session.scalar(stmt) is not None
 
 
 def active_teacher_exists(session: Session, teacher_id: int) -> bool:
-    return session.scalar(
-        select(Teacher.id).where(
-            Teacher.id == teacher_id,
-            Teacher.status == TeacherStatus.ACTIVE.value,
+    return (
+        session.scalar(
+            select(Teacher.id).where(
+                Teacher.id == teacher_id,
+                Teacher.status == TeacherStatus.ACTIVE.value,
+            )
         )
-    ) is not None
+        is not None
+    )

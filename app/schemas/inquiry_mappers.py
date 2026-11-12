@@ -39,7 +39,10 @@ def to_public_status_response(inquiry: StudentInquiry) -> PublicInquiryStatusRes
         admission_summary = PublicAdmissionSummary(
             admission_code=inquiry.admission.admission_code,
             status=inquiry.admission.status,
-            documents_uploaded=len(inquiry.admission.documents),
+            documents_uploaded=sum(
+                document.document_type in REQUIRED_ADMISSION_DOCUMENTS
+                for document in inquiry.admission.documents
+            ),
             documents_required=len(REQUIRED_ADMISSION_DOCUMENTS),
             documents=[
                 PublicAdmissionDocumentSummary(
@@ -70,6 +73,9 @@ def to_public_status_response(inquiry: StudentInquiry) -> PublicInquiryStatusRes
         )
     return PublicInquiryStatusResponse(
         inquiry_code=inquiry.inquiry_code,
+        student_name=" ".join(
+            part for part in (inquiry.first_name, inquiry.middle_name, inquiry.last_name) if part
+        ),
         status=inquiry.status,
         rejection_reason=inquiry.rejection_reason,
         admission_for_class=inquiry.admission_for_class,

@@ -3,8 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { ClassRecordSelector } from '@/components/school/class-record-selector'
 import { AdmissionDocumentsPanel } from '@/features/admissions/admission-documents-panel'
-import { admissionsApi, type Admission } from '@/features/admissions/admissions-api'
+import {
+  admissionsApi,
+  REQUIRED_ADMISSION_DOCUMENT_TYPES,
+  type Admission,
+} from '@/features/admissions/admissions-api'
 import { FormDialog } from '@/components/school/form-dialog'
 import { RecordList } from '@/components/school/record-list'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -13,9 +18,7 @@ import { EmptyState, ErrorState, LoadingState, SuccessState } from '@/components
 import { FormField } from '@/components/ui/form-field'
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
-import { SearchableSelect } from '@/components/ui/searchable-select'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { schoolApi } from '@/features/school/school-api'
 import { toApiError } from '@/lib/api/api-error'
 import { useAuth } from '@/features/auth/auth-context'
@@ -63,6 +66,15 @@ function AdmissionEditDialog({
     ),
     enabled: open,
   })
+  const classOptions = classesQuery.data?.items ?? []
+  const academicYears = [...new Set([
+    ...classOptions.map((item) => item.academic_year),
+    admission?.academic_year ?? '',
+  ].filter(Boolean))].sort().reverse()
+  const sections = [...new Set([
+    ...classOptions.map((item) => item.section ?? ''),
+    admission?.section ?? '',
+  ])].sort()
   const form = useForm<AdmissionEditValues>({
     resolver: zodResolver(admissionEditSchema),
     defaultValues: admission ? {
@@ -112,15 +124,14 @@ function AdmissionEditDialog({
       title={`Edit admission${admission ? ` — ${admission.admission_code}` : ''}`}
     >
       {errorMessage ? <ErrorState title="Admission was not updated" description={errorMessage} /> : null}
-      {classesQuery.error ? <ErrorState description={toApiError(classesQuery.error).message} onRetry={() => void classesQuery.refetch()} /> : (
-        <SearchableSelect
-          label="Target active class"
-          onChange={setClassId}
-          options={(classesQuery.data?.items ?? []).map((item) => ({
-            value: String(item.id),
-            label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-          }))}
-          value={classId || (admission ? String(admission.class_id) : '')}
+      {classesQuery.error ? (
+        <ErrorState description={toApiError(classesQuery.error).message} onRetry={() => void classesQuery.refetch()} />
+      ) : (
+        <ClassRecordSelector
+          classes={classesQuery.data?.items ?? []}
+          initialClassId={admission?.class_id}
+          labelPrefix="Target active class"
+          onChange={(_, schoolClass) => setClassId(schoolClass ? String(schoolClass.id) : '')}
         />
       )}
       <form className="mt-4 grid gap-4 sm:grid-cols-2" noValidate onSubmit={form.handleSubmit((values) => {
@@ -128,10 +139,20 @@ function AdmissionEditDialog({
         mutation.mutate(values)
       })}>
         <FormField error={form.formState.errors.academic_year?.message} label="Academic year" required>
-          {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} {...form.register('academic_year')} />}
+          {({ id, describedBy }) => (
+            <select id={id} aria-describedby={describedBy} className="h-10 rounded-lg border border-input bg-white px-3 text-sm" {...form.register('academic_year')}>
+              <option value="">Select an academic year</option>
+              {academicYears.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          )}
         </FormField>
         <FormField error={form.formState.errors.section?.message} label="Section">
-          {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} {...form.register('section')} />}
+          {({ id, describedBy }) => (
+            <select id={id} aria-describedby={describedBy} className="h-10 rounded-lg border border-input bg-white px-3 text-sm" {...form.register('section')}>
+              <option value="">Not specified</option>
+              {sections.filter(Boolean).map((section) => <option key={section} value={section}>{section}</option>)}
+            </select>
+          )}
         </FormField>
         <FormField label="Permanent address">
           {({ id }) => <Input id={id} {...form.register('permanent_address')} />}
@@ -225,6 +246,9 @@ function AdmissionDetailDialog({
   const queryClient = useQueryClient()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [enrollmentSection, setEnrollmentSection] = useState('')
+  const [enrollmentAcademicYear, setEnrollmentAcademicYear] = useState('')
+  const [enrollmentDialogOpen, setEnrollmentDialogOpen] = useState(false)
   const enabled = open && admissionId !== null
   const admissionQuery = useQuery({
     queryKey: ['admissions', admissionId],
@@ -232,6 +256,27 @@ function AdmissionDetailDialog({
     enabled,
   })
   const admission = admissionQuery.data
+  const canEnroll = user?.permissions?.includes('enrollment.create') ?? false
+  const canReadClasses = user?.permissions?.includes('classes.read') ?? false
+  const enrollmentClassesQuery = useQuery({
+    queryKey: ['classes', 'enrollment-options', admission?.id, admission?.class_name],
+    queryFn: () => schoolApi.classes.list(
+      { page: 1, limit: 100, sort_by: 'name', sort_order: 'asc' },
+      { status: 'active' },
+    ),
+    enabled: enabled && admission?.status === 'approved' && canEnroll && canReadClasses,
+  })
+  const gradeClasses = enrollmentClassesQuery.data?.items.filter((item) => (
+    item.name === admission?.class_name
+  )) ?? []
+  const enrollmentYears = [...new Set(gradeClasses.map((item) => item.academic_year))].sort().reverse()
+  const enrollmentSections = [...new Set(gradeClasses
+    .filter((item) => item.academic_year === enrollmentAcademicYear)
+    .map((item) => item.section)
+    .filter((section): section is string => Boolean(section)))].sort()
+  const selectedEnrollmentClass = gradeClasses.find((item) => (
+    item.section === enrollmentSection && item.academic_year === enrollmentAcademicYear
+  ))
   const canReadInquiry = user?.permissions?.includes('inquiries.read') ?? false
   const inquiryQuery = useQuery({
     queryKey: ['inquiries', admission?.inquiry_id],
@@ -257,11 +302,13 @@ function AdmissionDetailDialog({
   const enrollmentMutation = useMutation({
     mutationFn: () => {
       if (admissionId === null) throw new Error('Select an admission first.')
-      return admissionsApi.admissions.enroll(admissionId)
+      if (!selectedEnrollmentClass) throw new Error('Select a section and academic year for enrollment.')
+      return admissionsApi.admissions.enroll(admissionId, selectedEnrollmentClass.id)
     },
     onSuccess: async (result) => {
       setSuccessMessage(`Enrolled ${result.student_code}; roll number ${result.roll_number}.`)
       setErrorMessage(null)
+      setEnrollmentDialogOpen(false)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admissions'] }),
         queryClient.invalidateQueries({ queryKey: ['admissions', admissionId] }),
@@ -271,12 +318,10 @@ function AdmissionDetailDialog({
     },
     onError: (error) => setErrorMessage(toApiError(error).message),
   })
-  const requiredTypes = ['progress_report', 'transfer_certificate', 'migration_certificate', 'character_certificate', 'student_aadhar', 'parent_aadhar']
   const documentsVerified = admission !== undefined
-    && requiredTypes.every((type) => admission.documents.some((document) => document.document_type === type && document.verification_status === 'VERIFIED'))
+    && REQUIRED_ADMISSION_DOCUMENT_TYPES.every((type) => admission.documents.some((document) => document.document_type === type && document.verification_status === 'VERIFIED'))
   const canUpdate = user?.permissions?.includes('admissions.update') ?? false
   const canApprove = user?.permissions?.includes('admissions.approve') ?? false
-  const canEnroll = user?.permissions?.includes('enrollment.create') ?? false
   const canReject = user?.permissions?.includes('admissions.reject') ?? false
   const isClosed = admission?.status === 'approved' || admission?.status === 'rejected'
 
@@ -297,8 +342,8 @@ function AdmissionDetailDialog({
               <p><strong>Status:</strong> {admission.status}</p>
               <p><strong>Inquiry ID:</strong> {admission.inquiry_id}</p>
               <p><strong>Class:</strong> {admission.class_name ?? `Class ${admission.class_id}`}</p>
-              <p><strong>Section:</strong> {admission.section ?? '—'}</p>
-              <p><strong>Academic year:</strong> {admission.academic_year}</p>
+              <p><strong>Section:</strong> {admission.section ?? 'Assigned during enrollment'}</p>
+              <p><strong>Academic year:</strong> {admission.academic_year} <span className="text-xs text-slate-500">(finalized during enrollment)</span></p>
               <p><strong>Student ID:</strong> {admission.student_id ?? 'Not enrolled'}</p>
               <p><strong>Student Aadhaar:</strong> {admission.student_aadhaar_masked ?? 'Not provided'}</p>
               <p><strong>Parent Aadhaar:</strong> {admission.parent_aadhaar_masked ?? 'Not provided'}</p>
@@ -328,13 +373,81 @@ function AdmissionDetailDialog({
               ) : null}
               {canReject && !isClosed ? <Button onClick={() => onReject(admission)} variant="destructive">Reject admission</Button> : null}
               {canEnroll && admission.status === 'approved' && admission.student_id === null ? (
-                <ConfirmDialog
-                  confirmLabel={enrollmentMutation.isPending ? 'Enrolling…' : 'Enroll student'}
-                  description="Enrollment creates the student record and assigns its student code and roll number. All required documents must be verified, and the target class must be active and have capacity."
-                  onConfirm={async () => { await enrollmentMutation.mutateAsync() }}
-                  title={`Enroll ${admission.admission_code}?`}
-                  trigger={<Button disabled={!documentsVerified || enrollmentMutation.isPending} variant="outline">Enroll student</Button>}
-                />
+                <>
+                  <Button
+                    disabled={!documentsVerified || enrollmentMutation.isPending}
+                    onClick={() => {
+                      setEnrollmentSection('')
+                      setEnrollmentAcademicYear('')
+                      setEnrollmentDialogOpen(true)
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    Enroll student
+                  </Button>
+                  <Dialog onOpenChange={setEnrollmentDialogOpen} open={enrollmentDialogOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Assign section for enrollment</DialogTitle>
+                        <DialogDescription>
+                          Choose the section and academic year for {admission.class_name ?? 'the requested class'}. The parent did not select these; school staff assign them during enrollment.
+                        </DialogDescription>
+                      </DialogHeader>
+                      {!canReadClasses ? (
+                        <ErrorState description="Class-viewing permission is required to assign an enrollment section." />
+                      ) : enrollmentClassesQuery.isLoading ? <LoadingState label="Loading available sections" /> : enrollmentClassesQuery.error ? (
+                        <ErrorState description={toApiError(enrollmentClassesQuery.error).message} onRetry={() => void enrollmentClassesQuery.refetch()} />
+                      ) : gradeClasses.length ? (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="grid gap-2 text-sm font-medium">
+                            Academic year
+                            <select
+                              className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm"
+                              onChange={(event) => {
+                                setEnrollmentAcademicYear(event.target.value)
+                                setEnrollmentSection('')
+                              }}
+                              value={enrollmentAcademicYear}
+                            >
+                              <option value="">Select an academic year</option>
+                              {enrollmentYears.map((year) => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="grid gap-2 text-sm font-medium">
+                            Section
+                            <select
+                              className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm"
+                              disabled={!enrollmentAcademicYear}
+                              onChange={(event) => setEnrollmentSection(event.target.value)}
+                              value={enrollmentSection}
+                            >
+                              <option value="">Select a section</option>
+                              {enrollmentSections.map((section) => (
+                                <option key={section} value={section}>{section}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      ) : <p className="text-sm text-amber-800">No active classes are available for this grade.</p>}
+                      {enrollmentMutation.error ? <ErrorState title="Enrollment failed" description={toApiError(enrollmentMutation.error).message} /> : null}
+                      <DialogFooter>
+                        <Button onClick={() => setEnrollmentDialogOpen(false)} type="button" variant="outline">
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={!selectedEnrollmentClass || enrollmentMutation.isPending || !documentsVerified}
+                          onClick={() => enrollmentMutation.mutate()}
+                          type="button"
+                        >
+                          {enrollmentMutation.isPending ? 'Enrolling…' : 'Confirm enrollment'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </>
               ) : null}
             </div>
             {canApprove && admission.status === 'document_verification' && !documentsVerified ? (

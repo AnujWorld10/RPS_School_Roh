@@ -16,6 +16,7 @@ type RecordListProps<T> = {
   error?: string
   onRetry: () => void
   emptyMessage: string
+  caption?: string
   toolbar?: ReactNode
 }
 
@@ -29,6 +30,7 @@ export function RecordList<T>({
   error,
   onRetry,
   emptyMessage,
+  caption = 'School records',
   toolbar,
 }: RecordListProps<T>) {
   const lastAvailablePage = Math.max(pagination?.total_pages ?? 1, 1)
@@ -47,7 +49,7 @@ export function RecordList<T>({
       {toolbar ? <div className="border-b border-slate-200 p-4">{toolbar}</div> : null}
       <CardContent className="overflow-x-auto p-0">
         <DataTable
-          caption="School records"
+          caption={caption}
           columns={columns}
           emptyMessage={emptyMessage}
           getRowId={getRowId}

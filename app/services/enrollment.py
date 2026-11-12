@@ -41,6 +41,7 @@ class EnrollmentService:
         admission_id: int,
         actor_id: int,
         request: Request,
+        class_id: int | None = None,
     ) -> EnrollmentResponse:
         """
         Create ``students`` row from approved admission and set inquiry to ADMISSION_SUCCESS.
@@ -68,24 +69,32 @@ class EnrollmentService:
             if any(
                 document.verification_status != DocumentVerificationStatus.VERIFIED.value
                 for document in admission.documents
+                if document.document_type in REQUIRED_ADMISSION_DOCUMENTS
             ):
-                raise BusinessRuleException("All admission documents must be verified")
+                raise BusinessRuleException("All required admission documents must be verified")
 
             inquiry = admission.inquiry
             if not inquiry:
                 raise NotFoundException("Linked inquiry not found")
 
-            school_class = self.classes.get_active_for_update(admission.class_id)
+            target_class_id = class_id or admission.class_id
+            school_class = self.classes.get_active_for_update(target_class_id)
             if not school_class or school_class.status != ClassStatus.ACTIVE.value:
                 raise BusinessRuleException("Target class is not active")
+            if school_class.name != admission.school_class.name:
+                raise BusinessRuleException("Enrollment class must match the admission grade")
+            admission.class_id = school_class.id
+            admission.section = school_class.section
+            admission.academic_year = school_class.academic_year
+            self.admissions.update(admission)
 
-            enrolled = self.classes.count_active_students(admission.class_id)
+            enrolled = self.classes.count_active_students(school_class.id)
             if enrolled >= school_class.capacity:
                 raise BusinessRuleException("Class capacity exceeded")
 
             roll_number = allocate_roll_number(
                 self.session,
-                admission.class_id,
+                school_class.id,
                 admission.academic_year,
             )
             student_code = generate_student_code(self.session)
@@ -100,8 +109,8 @@ class EnrollmentService:
                     gender=inquiry.gender,
                     email=inquiry.email,
                     phone=inquiry.student_mobile or inquiry.parent_mobile,
-                    class_id=admission.class_id,
-                    current_class_id=admission.class_id,
+                    class_id=school_class.id,
+                    current_class_id=school_class.id,
                     academic_year=admission.academic_year,
                     roll_number=roll_number,
                     status=StudentStatus.ACTIVE.value,
@@ -139,7 +148,7 @@ class EnrollmentService:
                 admission_id=admission.id,
                 admission_code=admission.admission_code,
                 inquiry_code=inquiry.inquiry_code,
-                class_id=admission.class_id,
+                class_id=school_class.id,
                 section=admission.section,
                 academic_year=admission.academic_year,
                 roll_number=roll_number,

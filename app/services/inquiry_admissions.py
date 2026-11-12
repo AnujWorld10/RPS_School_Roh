@@ -13,6 +13,7 @@ from app.core.pagination import PaginatedResult, PaginationParams
 from app.core.transactions import transaction
 from app.models.admission import AdmissionDocument, InquiryAdmission
 from app.models.enums import (
+    OPTIONAL_ADMISSION_DOCUMENTS,
     REQUIRED_ADMISSION_DOCUMENTS,
     AdmissionStatus,
     ClassStatus,
@@ -60,10 +61,10 @@ class InquiryAdmissionService:
         inquiry = self.inquiries.get_by_id(inquiry_id)
         if not inquiry:
             raise NotFoundException("Inquiry not found")
-        if inquiry.status != InquiryStatus.INTERVIEW_PASS.value:
-            raise BusinessRuleException("Admission requires inquiry status INTERVIEW_PASS")
         if self.repo.get_by_inquiry_id(inquiry_id):
             raise ConflictException("Admission already exists for this inquiry")
+        if inquiry.status != InquiryStatus.INTERVIEW_PASS.value:
+            raise BusinessRuleException("Admission requires inquiry status INTERVIEW_PASS")
 
         school_class = self.classes.get_active(payload.class_id)
         if not school_class or school_class.status != ClassStatus.ACTIVE.value:
@@ -79,7 +80,11 @@ class InquiryAdmissionService:
                     admission_code=generate_admission_code(self.session),
                     inquiry_id=inquiry_id,
                     class_id=payload.class_id,
-                    section=payload.section or school_class.section,
+                    section=(
+                        payload.section
+                        if actor_id is None
+                        else payload.section or school_class.section
+                    ),
                     academic_year=payload.academic_year,
                     status=AdmissionStatus.SUBMITTED.value,
                     permanent_address=payload.permanent_address or inquiry.address,
@@ -190,8 +195,8 @@ class InquiryAdmissionService:
         file: UploadFile,
         request: Request,
     ) -> AdmissionDocument:
-        """Upload or replace one required document type."""
-        if document_type not in REQUIRED_ADMISSION_DOCUMENTS:
+        """Upload or replace one required or optional admission document."""
+        if document_type not in REQUIRED_ADMISSION_DOCUMENTS | OPTIONAL_ADMISSION_DOCUMENTS:
             raise BusinessRuleException(f"Invalid document type: {document_type}")
 
         admission = self.get_admission(admission_id)
@@ -303,14 +308,25 @@ class InquiryAdmissionService:
         """When all required docs are verified, move admission and inquiry forward."""
         admission = self.get_admission(admission_id)
         docs = self.documents.list_for_admission(admission_id)
-        uploaded_types = {d.document_type for d in docs}
+        required_docs = [
+            document
+            for document in docs
+            if document.document_type in REQUIRED_ADMISSION_DOCUMENTS
+        ]
+        uploaded_types = {document.document_type for document in required_docs}
         if not REQUIRED_ADMISSION_DOCUMENTS.issubset(uploaded_types):
             return
 
-        if any(d.verification_status == DocumentVerificationStatus.REJECTED.value for d in docs):
+        if any(
+            document.verification_status == DocumentVerificationStatus.REJECTED.value
+            for document in required_docs
+        ):
             return
 
-        if all(d.verification_status == DocumentVerificationStatus.VERIFIED.value for d in docs):
+        if all(
+            document.verification_status == DocumentVerificationStatus.VERIFIED.value
+            for document in required_docs
+        ):
             admission.status = AdmissionStatus.DOCUMENT_VERIFICATION.value
             self.repo.update(admission)
             inquiry = self.inquiries.get_by_id_for_update(admission.inquiry_id)
@@ -348,8 +364,11 @@ class InquiryAdmissionService:
             if any(
                 document.verification_status != DocumentVerificationStatus.VERIFIED.value
                 for document in docs
+                if document.document_type in REQUIRED_ADMISSION_DOCUMENTS
             ):
-                raise BusinessRuleException("All documents must be verified before approval")
+                raise BusinessRuleException(
+                    "All required documents must be verified before approval"
+                )
 
             admission.status = AdmissionStatus.APPROVED.value
             admission.approved_by = actor_id

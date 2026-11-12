@@ -22,6 +22,27 @@ import { schoolApi, type Subject } from '@/features/school/school-api'
 const subjectSchema = z.object({
   code: z.string().trim().min(1).max(50),
   name: z.string().trim().min(1).max(100),
+  category: z.string().trim().max(100),
+  description: z.string().trim().max(2000),
+  subject_type: z.enum(['mandatory', 'elective', 'optional']),
+  max_marks: z.string(),
+  passing_marks: z.string(),
+}).superRefine((value, context) => {
+  const maximum = value.max_marks.trim() ? Number(value.max_marks) : null
+  const passing = value.passing_marks.trim() ? Number(value.passing_marks) : null
+  if ((maximum === null) !== (passing === null)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['passing_marks'],
+      message: 'Enter both maximum and passing marks, or leave both blank.',
+    })
+  } else if (maximum !== null && (!Number.isFinite(maximum) || maximum <= 0 || passing! < 0 || passing! > maximum)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['passing_marks'],
+      message: 'Passing marks must be between zero and maximum marks.',
+    })
+  }
 })
 
 type SubjectFormValues = z.infer<typeof subjectSchema>
@@ -39,11 +60,36 @@ function SubjectFormDialog({
   const [formError, setFormError] = useState<string | null>(null)
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectSchema),
-    defaultValues: subject ? { code: subject.code, name: subject.name } : { code: '', name: '' },
+    defaultValues: subject
+      ? {
+          code: subject.code,
+          name: subject.name,
+          category: subject.category ?? '',
+          description: subject.description ?? '',
+          subject_type: subject.subject_type,
+          max_marks: subject.max_marks === null ? '' : String(subject.max_marks),
+          passing_marks: subject.passing_marks === null ? '' : String(subject.passing_marks),
+        }
+      : {
+          code: '',
+          name: '',
+          category: '',
+          description: '',
+          subject_type: 'mandatory',
+          max_marks: '',
+          passing_marks: '',
+        },
   })
   const mutation = useMutation({
     mutationFn: (values: SubjectFormValues) => {
-      const payload = { ...values, code: values.code.toUpperCase() }
+      const payload = {
+        ...values,
+        code: values.code.toUpperCase(),
+        category: values.category || null,
+        description: values.description || null,
+        max_marks: values.max_marks.trim() ? Number(values.max_marks) : null,
+        passing_marks: values.passing_marks.trim() ? Number(values.passing_marks) : null,
+      }
       return subject
         ? schoolApi.subjects.update(subject.id, payload)
         : schoolApi.subjects.create(payload)
@@ -80,6 +126,45 @@ function SubjectFormDialog({
         </FormField>
         <FormField error={form.formState.errors.name?.message} label="Subject name" required>
           {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} {...form.register('name')} />}
+        </FormField>
+        <FormField error={form.formState.errors.category?.message} label="Category">
+          {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} {...form.register('category')} />}
+        </FormField>
+        <FormField error={form.formState.errors.subject_type?.message} label="Catalog classification" required>
+          {({ id, describedBy }) => (
+            <select
+              className="h-10 rounded-lg border border-input bg-white px-3 text-sm"
+              id={id}
+              aria-describedby={describedBy}
+              {...form.register('subject_type')}
+            >
+              <option value="mandatory">Mandatory</option>
+              <option value="elective">Elective</option>
+              <option value="optional">Optional</option>
+            </select>
+          )}
+        </FormField>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField error={form.formState.errors.max_marks?.message} label="Default maximum marks">
+            {({ id, describedBy }) => (
+              <Input id={id} aria-describedby={describedBy} min="0.01" step="0.01" type="number" {...form.register('max_marks')} />
+            )}
+          </FormField>
+          <FormField error={form.formState.errors.passing_marks?.message} label="Default passing marks">
+            {({ id, describedBy }) => (
+              <Input id={id} aria-describedby={describedBy} min="0" step="0.01" type="number" {...form.register('passing_marks')} />
+            )}
+          </FormField>
+        </div>
+        <FormField error={form.formState.errors.description?.message} label="Description">
+          {({ id, describedBy }) => (
+            <textarea
+              className="min-h-20 rounded-lg border border-input bg-white px-3 py-2 text-sm"
+              id={id}
+              aria-describedby={describedBy}
+              {...form.register('description')}
+            />
+          )}
         </FormField>
         <div className="flex justify-end gap-2">
           <Button onClick={() => onOpenChange(false)} type="button" variant="outline">Cancel</Button>
@@ -130,6 +215,8 @@ export function SubjectsPage() {
   const columns = [
     { id: 'code', header: 'Code', cell: (subject: Subject) => <span className="font-semibold">{subject.code}</span> },
     { id: 'name', header: 'Subject', cell: (subject: Subject) => subject.name },
+    { id: 'category', header: 'Category', cell: (subject: Subject) => subject.category || '—' },
+    { id: 'type', header: 'Type', cell: (subject: Subject) => subject.subject_type },
     { id: 'status', header: 'Status', cell: (subject: Subject) => <StatusBadge status={subject.is_active ? 'active' : 'inactive'} /> },
     { id: 'actions', header: 'Actions', cell: (subject: Subject) => (
       <div className="flex flex-wrap gap-2">

@@ -16,6 +16,8 @@ import { PublicSchoolNavigation } from '@/components/layout/public-school-naviga
 import { PublicNavDropdown } from '@/components/layout/public-nav-dropdown'
 import {
   admissionsApi,
+  OPTIONAL_ADMISSION_DOCUMENT_TYPES,
+  REQUIRED_ADMISSION_DOCUMENT_TYPES,
   type DocumentType,
   type PublicInquiryStatus,
 } from '@/features/admissions/admissions-api'
@@ -342,7 +344,9 @@ const documentLabels: Record<DocumentType, string> = {
   parent_aadhar: 'Parent Aadhaar document',
 }
 
-const requiredAdmissionDocuments = Object.keys(documentLabels) as DocumentType[]
+const requiredAdmissionDocuments = REQUIRED_ADMISSION_DOCUMENT_TYPES
+const optionalAdmissionDocuments = OPTIONAL_ADMISSION_DOCUMENT_TYPES
+const submissionDocumentTypes = [...requiredAdmissionDocuments, ...optionalAdmissionDocuments]
 
 function PublicAdmissionDocumentUploads({
   credentials,
@@ -373,7 +377,10 @@ function PublicAdmissionDocumentUploads({
   const needsUpload = requiredAdmissionDocuments.filter((type) => {
     const document = documentsByType.get(type)
     return !document || document.verification_status === 'REJECTED'
-  })
+  }).concat(optionalAdmissionDocuments.filter((type) => {
+    const document = documentsByType.get(type)
+    return !document || document.verification_status === 'REJECTED'
+  }))
 
   if (!needsUpload.length) return null
 
@@ -816,12 +823,17 @@ const admissionDetailsSchema = z.object({
 
 type AdmissionDetails = z.infer<typeof admissionDetailsSchema>
 
+function classGradeNumber(className: string) {
+  const match = className.match(/(?:grade|class)\s*(\d{1,2})|(\d{1,2})(?:st|nd|rd|th)?\s*(?:grade|class)/i)
+  const grade = Number(match?.[1] ?? match?.[2])
+  return Number.isInteger(grade) && grade >= 1 && grade <= 12 ? grade : null
+}
+
 export function PublicAdmissionSubmissionPage() {
   const [verifiedInquiry, setVerifiedInquiry] = useState<{
     credentials: Credentials
     status: PublicInquiryStatus
   } | null>(null)
-  const [selectedClassId, setSelectedClassId] = useState('')
   const [availableClasses, setAvailableClasses] = useState<
     Awaited<ReturnType<typeof admissionsApi.public.listAdmissionClasses>> | null
   >(null)
@@ -837,12 +849,14 @@ export function PublicAdmissionSubmissionPage() {
     try {
       const classes = await admissionsApi.public.listAdmissionClasses()
       setAvailableClasses(classes)
+      const requestedGrade = classGradeNumber(requestedClass)
       const matchingClass = classes
-        .filter((schoolClass) => schoolClass.name.trim().toLocaleLowerCase()
-          === requestedClass.trim().toLocaleLowerCase())
+        .filter((schoolClass) => requestedGrade !== null
+          ? classGradeNumber(schoolClass.name) === requestedGrade
+          : schoolClass.name.trim().toLocaleLowerCase() === requestedClass.trim().toLocaleLowerCase())
         .sort((left, right) => right.academic_year.localeCompare(left.academic_year))[0]
-      if (matchingClass) {
-        setSelectedClassId(String(matchingClass.id))
+      if (!matchingClass) {
+        setClassesError(`No active class is available for ${requestedClass}. Please contact the school administration.`)
       }
     } catch (error) {
       setClassesError(toApiError(error).message)
@@ -885,17 +899,19 @@ export function PublicAdmissionSubmissionPage() {
   const mutation = useMutation({
     mutationFn: async (values: AdmissionDetails) => {
       if (!verifiedInquiry || !selectedClass) {
-        throw new Error('Verify your inquiry and select a class and academic year.')
+        throw new Error('The requested class is unavailable. Please contact the school administration.')
       }
       const missing = requiredAdmissionDocuments.filter((type) => !documentFiles[type])
       if (missing.length) {
         throw new Error(`Select all required documents before submitting: ${missing.map((type) => documentLabels[type]).join(', ')}.`)
       }
+      const documentsToUpload = submissionDocumentTypes.filter((type) => (
+        requiredAdmissionDocuments.includes(type) || Boolean(documentFiles[type])
+      ))
       const admission = await admissionsApi.public.submitAdmission({
         ...verifiedInquiry.credentials,
         class_id: selectedClass.id,
         academic_year: selectedClass.academic_year,
-        section: selectedClass.section || undefined,
         permanent_address: values.permanent_address || undefined,
         student_aadhaar: values.student_aadhaar,
         parent_aadhaar: values.parent_aadhaar,
@@ -905,7 +921,7 @@ export function PublicAdmissionSubmissionPage() {
       })
       return {
         admission,
-        ...await uploadSelectedDocuments(requiredAdmissionDocuments, verifiedInquiry.credentials),
+        ...await uploadSelectedDocuments(documentsToUpload, verifiedInquiry.credentials),
       }
     },
     onSuccess: (result) => {
@@ -961,14 +977,16 @@ export function PublicAdmissionSubmissionPage() {
   }
   const verifyError = verifyMutation.error ? toApiError(verifyMutation.error) : null
   const submissionError = mutation.error ? toApiError(mutation.error) : null
-  const selectedClass = (availableClasses ?? []).find(
-    (item) => String(item.id) === selectedClassId,
-  )
+  const requestedGrade = verifiedInquiry ? classGradeNumber(verifiedInquiry.status.admission_for_class) : null
+  const selectedClass = (availableClasses ?? [])
+    .filter((item) => requestedGrade !== null
+      ? classGradeNumber(item.name) === requestedGrade
+      : item.name.trim().toLocaleLowerCase() === verifiedInquiry?.status.admission_for_class.trim().toLocaleLowerCase())
+    .sort((left, right) => right.academic_year.localeCompare(left.academic_year))[0]
   const canSubmitAdmission = verifiedInquiry?.status.status === 'INTERVIEW_PASS'
     && !verifiedInquiry.status.admission
   const resetVerification = () => {
     setVerifiedInquiry(null)
-    setSelectedClassId('')
     verifyMutation.reset()
     setAvailableClasses(null)
     setClassesError(null)
@@ -1033,22 +1051,37 @@ export function PublicAdmissionSubmissionPage() {
                   Current status: {verifiedInquiry.status.status}. Requested class: {verifiedInquiry.status.admission_for_class}.
                 </AlertDescription>
               </Alert>
-              {!canSubmitAdmission ? (
+              {verifiedInquiry.status.admission ? (
+                <Alert>
+                  <AlertTitle>Your admission application is under review</AlertTitle>
+                  <AlertDescription>
+                    Your application has already been submitted. The school administration will update you shortly. For more information, contact administration at{' '}
+                    <a className="font-semibold underline" href="tel:+918967558216">+91 8967558216</a>
+                    {' '}or{' '}
+                    <a className="font-semibold underline" href="mailto:rpsschoolroh@gmail.com">rpsschoolroh@gmail.com</a>.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {!verifiedInquiry.status.admission && !canSubmitAdmission ? (
                 <Alert>
                   <AlertTitle>Admission application is not ready yet</AlertTitle>
                   <AlertDescription>
                     The school must record an interview pass before an admission application can be submitted.
-                    {verifiedInquiry.status.admission
-                      ? ' An admission application has already been started; use inquiry status to follow its progress.'
-                      : ' Please check your inquiry status again after the school updates it.'}
+                    {' '}Please check your inquiry status again after the school updates it.
                   </AlertDescription>
                 </Alert>
-              ) : mutation.data ? (
+              ) : !verifiedInquiry.status.admission && mutation.data ? (
                 <div className="grid gap-3">
                   <SuccessState
                     title="Admission application submitted"
-                    description={`The school can now review your application. ${uploadedDocuments.length} of ${requiredAdmissionDocuments.length} required documents uploaded.`}
+                    description={`Your admission application is under review. The school administration will update you shortly. ${uploadedDocuments.filter((type) => requiredAdmissionDocuments.includes(type)).length} of ${requiredAdmissionDocuments.length} required documents uploaded.`}
                   />
+                  <p className="text-sm text-slate-600">
+                    For more information, contact administration at{' '}
+                    <a className="font-semibold text-teal-800 underline" href="tel:+918967558216">+91 8967558216</a>
+                    {' '}or{' '}
+                    <a className="font-semibold text-teal-800 underline" href="mailto:rpsschoolroh@gmail.com">rpsschoolroh@gmail.com</a>.
+                  </p>
                   {failedDocuments.length ? (
                     <section className="grid gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4">
                       <div>
@@ -1096,7 +1129,7 @@ export function PublicAdmissionSubmissionPage() {
                     Check application status
                   </Link>
                 </div>
-              ) : (
+              ) : !verifiedInquiry.status.admission ? (
                 <>
                   {classesLoading ? <div role="status">Loading available classes…</div> : null}
                   {classesError ? (
@@ -1114,36 +1147,29 @@ export function PublicAdmissionSubmissionPage() {
                   ) : null}
                   {availableClasses?.length ? (
                     <>
-                      <p className="text-sm text-slate-600">
-                        Your inquiry requested <strong>{verifiedInquiry.status.admission_for_class}</strong>.
-                        Confirm it below or choose a different available class.
-                      </p>
-                      <div className="grid gap-2">
-                        <FormField label="Class and academic year" required>
-                          {({ id }) => (
-                            <select
-                              className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm"
-                              id={id}
-                              onChange={(event) => setSelectedClassId(event.target.value)}
-                              value={selectedClassId}
-                            >
-                              <option value="">Select a class</option>
-                              {availableClasses.map((schoolClass) => (
-                                <option key={schoolClass.id} value={schoolClass.id}>
-                                  {schoolClass.name}
-                                  {schoolClass.section ? ` — Section ${schoolClass.section}` : ''}
-                                  {' · '}{schoolClass.academic_year}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </FormField>
-                        {selectedClass ? (
-                          <p className="text-sm text-slate-600">
-                            Selected academic year: <strong>{selectedClass.academic_year}</strong>
-                          </p>
-                        ) : null}
-                      </div>
+                      <section aria-label="Admission class assignment" className="grid gap-2 rounded-lg border border-slate-200 p-4 sm:grid-cols-3">
+                        <div>
+                          <h2 className="text-sm font-medium">Student name</h2>
+                          <p>{verifiedInquiry.status.student_name}</p>
+                        </div>
+                        <div>
+                          <h2 className="text-sm font-medium">Class</h2>
+                          <p>{verifiedInquiry.status.admission_for_class}</p>
+                        </div>
+                        <div>
+                          <h2 className="text-sm font-medium">Academic year</h2>
+                          <p>Assigned by administration during enrollment</p>
+                        </div>
+                        <p className="text-sm text-slate-600 sm:col-span-3">
+                          Class and academic year are based on your inquiry. Administration will assign the section and academic year during enrollment.
+                        </p>
+                      </section>
+                      {availableClasses.length > 0 && !selectedClass ? (
+                        <Alert>
+                          <AlertTitle>Requested class is unavailable</AlertTitle>
+                          <AlertDescription>Please contact the school administration before submitting this application.</AlertDescription>
+                        </Alert>
+                      ) : null}
                       <form
                         className="grid gap-4"
                         noValidate
@@ -1188,12 +1214,19 @@ export function PublicAdmissionSubmissionPage() {
                         </div>
                         <section className="grid gap-3">
                           <div>
-                            <h2 className="font-semibold">Required admission documents</h2>
-                            <p className="text-sm text-slate-600">Upload all six documents as PDF, JPG, JPEG, or PNG. Files are checked against the school’s configured size limit.</p>
+                            <h2 className="font-semibold">Admission documents</h2>
+                            <p className="text-sm text-slate-600">Upload the four required documents. Migration and character certificates are optional and may be provided later. Files can be PDF, JPG, JPEG, or PNG.</p>
                           </div>
                           <div className="grid gap-3 sm:grid-cols-2">
-                            {requiredAdmissionDocuments.map((type) => (
-                              <FormField key={type} label={documentLabels[type]} required>
+                            {submissionDocumentTypes.map((type) => {
+                              const required = requiredAdmissionDocuments.includes(type)
+                              return (
+                              <FormField
+                                description={required ? undefined : 'Optional — you may provide this later.'}
+                                key={type}
+                                label={documentLabels[type]}
+                                required={required}
+                              >
                                 {({ id }) => (
                                   <input
                                     accept=".pdf,.jpg,.jpeg,.png"
@@ -1203,12 +1236,13 @@ export function PublicAdmissionSubmissionPage() {
                                       const file = event.currentTarget.files?.[0]
                                       if (file) setDocumentFiles((current) => ({ ...current, [type]: file }))
                                     }}
-                                    required
+                                    required={required}
                                     type="file"
                                   />
                                 )}
                               </FormField>
-                            ))}
+                              )
+                            })}
                           </div>
                         </section>
                         {submissionError ? (
@@ -1223,8 +1257,8 @@ export function PublicAdmissionSubmissionPage() {
                     </>
                   ) : null}
                 </>
-              )}
-              {!mutation.data ? (
+              ) : null}
+              {!mutation.data && !verifiedInquiry.status.admission ? (
                 <Button className="w-fit" onClick={resetVerification} type="button" variant="outline">
                   Change inquiry details
                 </Button>

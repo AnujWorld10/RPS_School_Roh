@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { PermissionGate } from '@/components/auth/permission-gate'
+import { ClassRecordSelector } from '@/components/school/class-record-selector'
 import { FormDialog } from '@/components/school/form-dialog'
 import { RecordList } from '@/components/school/record-list'
 import { FormField } from '@/components/ui/form-field'
@@ -14,7 +15,6 @@ import { ErrorState, LoadingState, SuccessState } from '@/components/ui/async-st
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { SearchField } from '@/components/ui/search-field'
-import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { admissionsApi, type Inquiry, type InquiryStatus } from '@/features/admissions/admissions-api'
 import { schoolApi } from '@/features/school/school-api'
@@ -42,6 +42,36 @@ const inquiryStatuses: InquiryStatus[] = [
   'ADMISSION_SUCCESS',
   'REJECTED',
 ]
+
+const inquiryStatusLabels: Record<InquiryStatus, string> = {
+  PENDING: 'Pending review',
+  UNDER_REVIEW: 'Under review',
+  PROCESSING: 'Processing',
+  INTERVIEW_SCHEDULED: 'Interview scheduled',
+  INTERVIEW_PASS: 'Interview passed',
+  INTERVIEW_FAIL: 'Interview not passed',
+  DOCUMENT_PENDING: 'Documents pending',
+  DOCUMENT_VERIFICATION: 'Documents under verification',
+  ADMISSION_SUCCESS: 'Admission successful',
+  REJECTED: 'Rejected',
+}
+
+const inquiryStatusDescriptions: Record<InquiryStatus, string> = {
+  PENDING: 'Waiting for a staff member to begin reviewing this inquiry.',
+  UNDER_REVIEW: 'A staff member is reviewing the submitted information.',
+  PROCESSING: 'The inquiry is being processed for the next admission step.',
+  INTERVIEW_SCHEDULED: 'An interview has been scheduled.',
+  INTERVIEW_PASS: 'The applicant passed the interview.',
+  INTERVIEW_FAIL: 'The applicant did not pass the interview.',
+  DOCUMENT_PENDING: 'Required admission documents are still pending.',
+  DOCUMENT_VERIFICATION: 'Submitted admission documents are being checked.',
+  ADMISSION_SUCCESS: 'The admission process is complete.',
+  REJECTED: 'The inquiry was rejected.',
+}
+
+function statusLabel(status: string) {
+  return inquiryStatusLabels[status as InquiryStatus] ?? status.replaceAll('_', ' ').toLowerCase()
+}
 
 const inquirySchema = z.object({
   first_name: z.string().trim().min(1).max(100),
@@ -191,14 +221,10 @@ function InquiryCreateDialog({
           <p className="text-sm text-destructive sm:col-span-2">Class mapping options unavailable: {toApiError(classesQuery.error).message}</p>
         ) : classesQuery.data?.items.length ? (
           <div className="sm:col-span-2">
-            <SearchableSelect
-              label="Optional catalog class mapping"
-              onChange={setClassId}
-              options={classesQuery.data.items.map((item) => ({
-                value: String(item.id),
-                label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-              }))}
-              value={classId}
+            <ClassRecordSelector
+              classes={classesQuery.data.items}
+              labelPrefix="Catalog class"
+              onChange={(_, schoolClass) => setClassId(schoolClass ? String(schoolClass.id) : '')}
             />
           </div>
         ) : null}
@@ -260,8 +286,18 @@ function InquiryDetailDialog({
                   <ol className="grid gap-2">
                     {inquiry.status_timeline.map((item) => (
                       <li className="rounded-md border border-slate-200 px-3 py-2 text-sm" key={item.id}>
-                        <strong>{item.from_status ?? 'Submitted'} → {item.to_status}</strong>
-                        <span className="block text-xs text-slate-500">{new Date(item.created_at).toLocaleString()} {item.change_reason ? `· ${item.change_reason}` : ''}</span>
+                        <strong>
+                          {item.from_status ? statusLabel(item.from_status) : 'Inquiry received'}
+                          <span aria-hidden="true"> → </span>
+                          {statusLabel(item.to_status)}
+                        </strong>
+                        {inquiryStatusDescriptions[item.to_status as InquiryStatus] ? (
+                          <p className="mt-1 text-slate-700">{inquiryStatusDescriptions[item.to_status as InquiryStatus]}</p>
+                        ) : null}
+                        <time className="mt-1 block text-xs text-slate-500" dateTime={item.created_at}>
+                          {new Date(item.created_at).toLocaleString()}
+                        </time>
+                        {item.change_reason ? <p className="mt-1 text-xs text-slate-500">{item.change_reason}</p> : null}
                       </li>
                     ))}
                   </ol>
@@ -295,6 +331,7 @@ function InquiryStaffActions({
   const queryClient = useQueryClient()
   const [notes, setNotes] = useState(inquiry.internal_notes ?? '')
   const [classId, setClassId] = useState(inquiry.admission_for_class_id ? String(inquiry.admission_for_class_id) : '')
+  const [classSelectionChanged, setClassSelectionChanged] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [applicationOpen, setApplicationOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -311,6 +348,8 @@ function InquiryStaffActions({
     ),
     enabled: canReadClasses,
   })
+  const classes = classesQuery.data?.items
+  const matchingClass = classes?.find((item) => String(item.id) === classId)
   const reviewMutation = useMutation({
     mutationFn: (action: 'start' | 'process' | 'reject') => {
       if (action === 'start') return admissionsApi.inquiries.startReview(inquiry.id, notes || undefined)
@@ -328,12 +367,15 @@ function InquiryStaffActions({
   })
   const editMutation = useMutation({
     mutationFn: () => admissionsApi.inquiries.updateStaff(inquiry.id, {
-      ...(classId ? { admission_for_class_id: Number(classId) } : {}),
+      ...(classSelectionChanged && matchingClass
+        ? { admission_for_class_id: matchingClass.id }
+        : classId ? { admission_for_class_id: Number(classId) } : {}),
       internal_notes: notes,
     }),
     onSuccess: async () => {
       setSuccessMessage('Staff notes and class mapping saved.')
       setErrorMessage(null)
+      setClassSelectionChanged(false)
       await queryClient.invalidateQueries({ queryKey: ['inquiries'] })
       await queryClient.invalidateQueries({ queryKey: ['inquiries', inquiry.id] })
     },
@@ -348,26 +390,32 @@ function InquiryStaffActions({
       {successMessage ? <SuccessState title="Inquiry updated" description={successMessage} /> : null}
       {errorMessage ? <ErrorState title="Inquiry action failed" description={errorMessage} /> : null}
       <section className="grid gap-2">
-        <h3 className="text-sm font-semibold">Staff-editable fields</h3>
-        <p className="text-xs text-slate-500">The staff API permits internal notes and catalog class mapping only. Applicant profile edits are not available in the staff API.</p>
+        <h3 className="text-sm font-semibold">Staff notes and class assignment</h3>
+        <p className="text-sm text-slate-600">Update the assigned class or add internal notes here. Applicant details, such as contact information, cannot be edited from this screen.</p>
         <label className="grid gap-2 text-sm font-medium">
           Internal notes
           <textarea className="min-h-20 rounded-lg border border-input bg-white p-3 text-sm" onChange={(event) => setNotes(event.target.value)} value={notes} />
         </label>
         {canReadClasses ? (
           classesQuery.error ? <ErrorState description={toApiError(classesQuery.error).message} onRetry={() => void classesQuery.refetch()} /> : (
-            <SearchableSelect
-              label="Requested catalog class"
-              onChange={setClassId}
-              options={(classesQuery.data?.items ?? []).map((item) => ({
-                value: String(item.id),
-                label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-              }))}
-              value={classId}
-            />
+            <div className="grid gap-3">
+              <ClassRecordSelector
+                classes={classes ?? []}
+                initialClassId={inquiry.admission_for_class_id ?? undefined}
+                gradeLabel="Grade level"
+                onChange={(_, schoolClass) => {
+                  setClassSelectionChanged(true)
+                  setClassId(schoolClass ? String(schoolClass.id) : '')
+                }}
+                disabled={!classes?.length}
+              />
+              {classSelectionChanged && !matchingClass ? (
+                <p className="text-sm text-amber-800 sm:col-span-3">No catalog class matches this grade, section, and academic year. Choose an available combination before saving.</p>
+              ) : null}
+            </div>
           )
-        ) : <p className="text-sm text-slate-500">Class mapping requires the classes.read permission.</p>}
-        {canEdit ? <Button disabled={editMutation.isPending} onClick={() => editMutation.mutate()} type="button" variant="outline">Save staff fields</Button> : null}
+        ) : <p className="text-sm text-slate-500">You need class-viewing access to assign a class.</p>}
+        {canEdit ? <Button disabled={editMutation.isPending || (classSelectionChanged && !matchingClass)} onClick={() => editMutation.mutate()} type="button" variant="outline">Save notes and class</Button> : null}
       </section>
       <div className="flex flex-wrap gap-2">
         {canEdit && inquiry.status === 'PENDING' ? <Button disabled={reviewMutation.isPending} onClick={() => reviewMutation.mutate('start')}>Start review</Button> : null}
@@ -452,20 +500,17 @@ function AdmissionCreateDialog({
       title="Create admission application"
     >
       {errorMessage ? <ErrorState title="Admission was not created" description={errorMessage} /> : null}
-      {classesQuery.error ? <ErrorState description={toApiError(classesQuery.error).message} onRetry={() => void classesQuery.refetch()} /> : (
-        <SearchableSelect
-          label="Active class"
-          onChange={(value) => {
-            setClassId(value)
-            const item = classesQuery.data?.items.find((option) => option.id === Number(value))
-            setAcademicYear(item?.academic_year ?? '')
-            setSection(item?.section ?? '')
+      {classesQuery.error ? (
+        <ErrorState description={toApiError(classesQuery.error).message} onRetry={() => void classesQuery.refetch()} />
+      ) : (
+        <ClassRecordSelector
+          classes={classesQuery.data?.items ?? []}
+          labelPrefix="Active class"
+          onChange={(_, schoolClass) => {
+            setClassId(schoolClass ? String(schoolClass.id) : '')
+            setAcademicYear(schoolClass?.academic_year ?? '')
+            setSection(schoolClass?.section ?? '')
           }}
-          options={(classesQuery.data?.items ?? []).map((item) => ({
-            value: String(item.id),
-            label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-          }))}
-          value={classId}
         />
       )}
       {selectedClass ? (
@@ -570,17 +615,13 @@ export function InquiriesPage() {
               {canReadClasses ? classesQuery.error ? (
                 <p className="text-sm text-destructive">Class filter unavailable: {toApiError(classesQuery.error).message}</p>
               ) : (
-                <SearchableSelect
-                  label="Filter by requested catalog class"
-                  onChange={(value) => {
-                    setClassId(value)
+                <ClassRecordSelector
+                  classes={classesQuery.data?.items ?? []}
+                  labelPrefix="Requested class"
+                  onChange={(_, schoolClass) => {
+                    setClassId(schoolClass ? String(schoolClass.id) : '')
                     setPage(1)
                   }}
-                  options={(classesQuery.data?.items ?? []).map((item) => ({
-                    value: String(item.id),
-                    label: `${item.name}${item.section ? ` · ${item.section}` : ''} · ${item.academic_year}`,
-                  }))}
-                  value={classId}
                 />
               ) : null}
             </div>

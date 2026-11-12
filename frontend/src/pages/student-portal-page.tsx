@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/async-state'
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
+import { schoolApi } from '@/features/school/school-api'
 import { studentPortalApi, type AdmissionFeeStructure, type MonthlyFeeStructure } from '@/features/school/student-portal-api'
 import { toApiError } from '@/lib/api/api-error'
 
@@ -108,6 +109,16 @@ export function StudentPortalPage() {
     queryFn: studentPortalApi.fees,
     enabled: profile.isSuccess,
   })
+  const subjects = useQuery({
+    queryKey: ['student-portal', 'subjects'],
+    queryFn: schoolApi.academics.mySubjects,
+    enabled: profile.isSuccess,
+  })
+  const results = useQuery({
+    queryKey: ['student-portal', 'results'],
+    queryFn: schoolApi.academics.myResults,
+    enabled: profile.isSuccess,
+  })
 
   return (
     <>
@@ -169,6 +180,108 @@ export function StudentPortalPage() {
               ) : null}
             </CardContent>
           </Card>
+
+          <section aria-labelledby="student-academics-heading" className="grid gap-4">
+            <div>
+              <h2 className="font-heading text-lg font-semibold text-slate-950" id="student-academics-heading">
+                Subjects and examination results
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Your subjects are scoped to your current class. Only results published by the school are shown here.
+              </p>
+            </div>
+            {subjects.isPending || results.isPending ? (
+              <LoadingState label="Loading your subjects and results" />
+            ) : null}
+            {subjects.isError ? (
+              <ErrorState
+                description={toApiError(subjects.error).message}
+                onRetry={() => void subjects.refetch()}
+                title="Your subjects are unavailable"
+              />
+            ) : null}
+            {results.isError ? (
+              <ErrorState
+                description={toApiError(results.error).message}
+                onRetry={() => void results.refetch()}
+                title="Your examination results are unavailable"
+              />
+            ) : null}
+            {subjects.data ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>My subjects</CardTitle>
+                  <CardDescription>Mandatory subjects and administration-confirmed elective selections.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {subjects.data.length > 0 ? (
+                    <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {subjects.data.filter((subject) => subject.selected).map((subject) => (
+                        <li className="rounded-lg border border-slate-200 px-3 py-2" key={subject.subject_id}>
+                          <span className="block text-sm font-medium text-slate-900">{subject.name}</span>
+                          <span className="text-xs text-slate-500">
+                            {subject.code} · {subject.subject_type}{subject.stream ? ` · ${subject.stream}` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-500">The school has not assigned subjects for your current class.</p>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+            {results.data ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Published results</CardTitle>
+                  <CardDescription>Examination marks and grades appear after the school publishes them.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {results.data.length > 0 ? (
+                    <div className="grid gap-4">
+                      {results.data.map((result) => (
+                        <article className="rounded-xl border border-slate-200 p-4" key={result.examination_id}>
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold text-slate-900">{result.examination_name}</h3>
+                              <p className="text-xs text-slate-500">{result.examination_type} · {result.academic_year} · {formatDate(result.start_date)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold">{result.total_obtained_marks} / {result.total_max_marks}</p>
+                              <p className="text-xs text-slate-600">{Number(result.percentage).toFixed(2)}% · Grade {result.grade} · {result.status}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 overflow-x-auto">
+                            <table className="w-full min-w-[420px] text-left text-sm">
+                              <thead className="text-xs uppercase tracking-wide text-slate-500">
+                                <tr><th className="py-2">Subject</th><th className="py-2">Component</th><th className="py-2">Marks</th><th className="py-2">Status</th></tr>
+                              </thead>
+                              <tbody>
+                                {result.marks.map((mark, index) => (
+                                  <tr className="border-t border-slate-100" key={`${mark.subject_id}-${mark.component}-${index}`}>
+                                    <td className="py-2">{mark.subject_name}</td>
+                                    <td className="py-2">{mark.component}</td>
+                                    <td className="py-2">{mark.obtained_marks ?? '—'} / {mark.max_marks}</td>
+                                    <td className="py-2">{mark.status}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      description="There are no published examination results for your account."
+                      title="No results yet"
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+          </section>
 
           <section aria-labelledby="student-fees-heading" className="grid gap-4">
             <div>

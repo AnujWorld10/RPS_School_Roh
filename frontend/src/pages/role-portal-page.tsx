@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ClassRecordSelector } from '@/components/school/class-record-selector'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState, ErrorState, LoadingState, SuccessState } from '@/components/ui/async-state'
 import { PageHeader } from '@/components/ui/page-header'
@@ -423,23 +424,16 @@ export function RolePortalPage({ role }: { role: 'student' | 'parent' | 'teacher
                 [queryKeys.teachingAssignments],
               )}
             >
-              <label className="grid gap-1 text-sm font-medium" htmlFor="mapping-class">Class</label>
-              <select
-                className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm"
-                id="mapping-class"
-                name="class_id"
-                onChange={(event) => {
-                  setMappingClassId(event.target.value)
+              <ClassRecordSelector
+                classes={activeClasses}
+                className="sm:col-span-2"
+                labelPrefix="Class"
+                onChange={(_, schoolClass) => {
+                  setMappingClassId(schoolClass ? String(schoolClass.id) : '')
                   setMappingSubjectId('')
                 }}
-                required
-                value={mappingClassId}
-              >
-                <option value="">Select a class</option>
-                {activeClasses.map((schoolClass) => (
-                  <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name} {schoolClass.section}</option>
-                ))}
-              </select>
+              />
+              <input name="class_id" type="hidden" value={mappingClassId} />
               <label className="grid gap-1 text-sm font-medium" htmlFor="mapping-subject">Subject offered to class</label>
               <select
                 className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm"
@@ -646,7 +640,12 @@ export function RolePortalPage({ role }: { role: 'student' | 'parent' | 'teacher
               <label className="grid gap-1 text-sm font-medium" htmlFor="timetable-room">Room (optional)</label>
               <input className="min-h-10 rounded-lg border border-input px-3 text-sm" id="timetable-room" maxLength={100} name="room" />
               <label className="grid gap-1 text-sm font-medium" htmlFor="timetable-year">Academic year</label>
-              <input className="min-h-10 rounded-lg border border-input px-3 text-sm" defaultValue={activeClasses[0]?.academic_year} id="timetable-year" maxLength={20} name="academic_year" required />
+              <select className="min-h-10 rounded-lg border border-input px-3 text-sm" defaultValue={activeClasses[0]?.academic_year ?? ''} id="timetable-year" name="academic_year" required>
+                <option value="">Select an academic year</option>
+                {[...new Set(activeClasses.map((schoolClass) => schoolClass.academic_year))]
+                  .sort((left, right) => right.localeCompare(left))
+                  .map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
               <button className="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:col-span-2" disabled={saving} type="submit">Save timetable period</button>
             </form>
           </CardContent>

@@ -5,11 +5,18 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext, type AuthContextValue } from '@/features/auth/auth-context'
 import { AdmissionDocumentsPanel } from '@/features/admissions/admission-documents-panel'
-import { admissionsApi, type Admission, type Inquiry, type Interview } from '@/features/admissions/admissions-api'
+import {
+  admissionsApi,
+  REQUIRED_ADMISSION_DOCUMENT_TYPES,
+  type Admission,
+  type Inquiry,
+  type Interview,
+} from '@/features/admissions/admissions-api'
 import { ApiError } from '@/lib/api/api-error'
 import { schoolApi } from '@/features/school/school-api'
 import { InquiriesPage } from '@/pages/inquiries-page'
 import { InterviewsPage } from '@/pages/interviews-page'
+import { AdmissionsPage } from '@/pages/admissions-page'
 
 const inquiry: Inquiry = {
   id: 8,
@@ -88,6 +95,82 @@ afterEach(() => {
 })
 
 describe('admission lifecycle pages', () => {
+  it('lets staff choose section and academic year separately during enrollment', async () => {
+    const user = userEvent.setup()
+    const admission: Admission = {
+      id: 12,
+      admission_code: 'ADM202600012',
+      inquiry_id: inquiry.id,
+      class_id: 2,
+      class_name: '5th Grade',
+      section: null,
+      academic_year: '2026-2027',
+      status: 'approved',
+      permanent_address: null,
+      student_aadhaar_masked: null,
+      parent_aadhaar_masked: null,
+      last_school_marks: null,
+      last_school_percentage: null,
+      last_school_id_or_roll_number: null,
+      temporary_address: null,
+      nationality: null,
+      disability: null,
+      blood_group: null,
+      reason_for_school_change: null,
+      rejection_reason: null,
+      notes: null,
+      student_id: null,
+      documents: REQUIRED_ADMISSION_DOCUMENT_TYPES.map((document_type, index) => ({
+        id: index + 1,
+        admission_id: 12,
+        document_type,
+        file_name: `${document_type}.pdf`,
+        verification_status: 'VERIFIED',
+        rejection_reason: null,
+        verified_at: '2026-11-11T00:00:00Z',
+      })),
+    }
+    vi.spyOn(admissionsApi.admissions, 'list').mockResolvedValue({
+      items: [admission],
+      pagination: { page: 1, limit: 10, total_records: 1, total_pages: 1 },
+    })
+    vi.spyOn(admissionsApi.admissions, 'get').mockResolvedValue(admission)
+    vi.spyOn(admissionsApi.admissions, 'requiredDocuments').mockResolvedValue({
+      required: REQUIRED_ADMISSION_DOCUMENT_TYPES,
+    })
+    const enroll = vi.spyOn(admissionsApi.admissions, 'enroll').mockResolvedValue({
+      student_id: 22,
+      student_code: 'RPS00022',
+      admission_id: admission.id,
+      admission_code: 'RPS00022',
+      inquiry_code: inquiry.inquiry_code,
+      class_id: 9,
+      section: 'B',
+      academic_year: '2025-2026',
+      roll_number: 1,
+    })
+    vi.spyOn(schoolApi.classes, 'list').mockResolvedValue({
+      items: [
+        { id: 2, class_teacher_id: null, name: '5th Grade', section: 'A', academic_year: '2026-2027', capacity: 40, status: 'active' },
+        { id: 9, class_teacher_id: null, name: '5th Grade', section: 'B', academic_year: '2025-2026', capacity: 40, status: 'active' },
+      ],
+      pagination: { page: 1, limit: 100, total_records: 2, total_pages: 1 },
+    })
+    renderWithAuth(<AdmissionsPage />, ['admissions.read', 'enrollment.create', 'classes.read'])
+
+    await user.click(await screen.findByRole('button', { name: 'Review' }))
+    await user.click(await screen.findByRole('button', { name: 'Enroll student' }))
+    const yearSelect = await screen.findByRole('combobox', { name: 'Academic year' })
+    const sectionSelect = screen.getByRole('combobox', { name: 'Section' })
+    expect(yearSelect).toHaveValue('')
+    expect(sectionSelect).toBeDisabled()
+    await user.selectOptions(yearSelect, '2025-2026')
+    await user.selectOptions(sectionSelect, 'B')
+    await user.click(screen.getByRole('button', { name: 'Confirm enrollment' }))
+
+    await waitFor(() => expect(enroll).toHaveBeenCalledWith(admission.id, 9))
+  })
+
   it('rejects a future inquiry date of birth before sending the request', async () => {
     const user = userEvent.setup()
     vi.spyOn(admissionsApi.inquiries, 'list').mockResolvedValue({
@@ -174,6 +257,11 @@ describe('admission lifecycle pages', () => {
     })
     renderWithAuth(<InterviewsPage />, ['inquiries.read', 'interviews.read', 'interviews.schedule'])
 
+    expect(await screen.findByRole('table', { name: 'Inquiries available for interview' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Search inquiries' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: 'Filter inquiries by status' })).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: 'Grade / class' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Grade 5' })).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'View interviews' }))
     await screen.findByRole('heading', { name: /INQ202600008/ })
     await user.click(screen.getByRole('button', { name: 'Schedule interview' }))
@@ -188,6 +276,51 @@ describe('admission lifecycle pages', () => {
       location: 'Room 4',
       mode: 'OFFLINE',
       remarks: undefined,
+    }))
+  })
+
+  it('explains inquiry history and lets staff assign a grade, section, and academic year', async () => {
+    const user = userEvent.setup()
+    const pendingInquiry: Inquiry = {
+      ...inquiry,
+      admission_for_class_id: null,
+      status: 'PENDING',
+      status_timeline: [{
+        id: 21,
+        from_status: null,
+        to_status: 'PENDING',
+        change_reason: 'Inquiry submitted via public form',
+        created_at: '2026-11-11T10:11:15Z',
+      }],
+    }
+    vi.spyOn(admissionsApi.inquiries, 'list').mockResolvedValue({
+      items: [pendingInquiry],
+      pagination: { page: 1, limit: 10, total_records: 1, total_pages: 1 },
+    })
+    vi.spyOn(admissionsApi.inquiries, 'get').mockResolvedValue(pendingInquiry)
+    const updateStaff = vi.spyOn(admissionsApi.inquiries, 'updateStaff').mockResolvedValue(pendingInquiry)
+    vi.spyOn(schoolApi.classes, 'list').mockResolvedValue({
+      items: [
+        { id: 23, class_teacher_id: null, name: '5th Grade', section: 'B', academic_year: '2026-2027', capacity: 40, status: 'active' },
+      ],
+      pagination: { page: 1, limit: 100, total_records: 1, total_pages: 1 },
+    })
+    renderWithAuth(<InquiriesPage />, ['inquiries.read', 'inquiries.review', 'classes.read'])
+
+    await user.click(await screen.findByRole('button', { name: 'Details' }))
+    expect(await screen.findByText(
+      (_, element) => element?.tagName === 'STRONG' && element.textContent === 'Inquiry received → Pending review',
+    )).toBeInTheDocument()
+    expect(screen.getByText('Waiting for a staff member to begin reviewing this inquiry.')).toBeInTheDocument()
+    expect(screen.getByText('Inquiry submitted via public form')).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Grade level' }), '5th Grade')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Section' }), 'B')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Academic year' }), '2026-2027')
+    await user.click(screen.getByRole('button', { name: 'Save notes and class' }))
+
+    await waitFor(() => expect(updateStaff).toHaveBeenCalledWith(pendingInquiry.id, {
+      admission_for_class_id: 23,
+      internal_notes: '',
     }))
   })
 
@@ -218,8 +351,6 @@ describe('admission lifecycle pages', () => {
     const required = [
       'progress_report',
       'transfer_certificate',
-      'migration_certificate',
-      'character_certificate',
       'student_aadhar',
       'parent_aadhar',
     ] as const
@@ -258,10 +389,20 @@ describe('admission lifecycle pages', () => {
     renderWithAuth(<AdmissionDocumentsPanel admission={admission} />, ['admissions.read'])
 
     await screen.findByText(/report.pdf/)
+    expect(await screen.findByText('Migration certificate')).toBeInTheDocument()
+    expect(screen.getByText('Character certificate')).toBeInTheDocument()
+    expect(screen.getAllByText('Not uploaded (optional)')).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Upload document' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'View' }))
 
     await waitFor(() => expect(view).toHaveBeenCalledWith(document.id))
     expect(await screen.findByTitle('Preview report.pdf')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByText('125%')).toBeInTheDocument()
   })
 })
